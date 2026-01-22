@@ -1,0 +1,30 @@
+[project]
+name = "hysoc"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "matsaks", email = "matsen2000@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "geopandas>=1.1.2",
+    "networkx>=3.6.1",
+    "numpy>=2.4.1",
+    "osmnx>=2.0.7",
+    "pandas>=3.0.0",
+    "scipy>=1.17.0",
+    "shapely>=2.1.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "matplotlib>=3.10.8",
+    "pytest>=9.0.2",
+    "ruff>=0.14.13",
+]
