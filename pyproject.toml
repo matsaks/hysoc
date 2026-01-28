@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "datasets>=4.5.0",
     "geopandas>=1.1.2",
     "networkx>=3.6.1",
     "numpy>=2.4.1",
@@ -15,6 +16,7 @@ dependencies = [
     "pandas>=3.0.0",
     "scipy>=1.17.0",
     "shapely>=2.1.2",
+    "tqdm>=4.67.1",
 ]
 
 [build-system]
@@ -27,4 +29,5 @@ dev = [
     "matplotlib>=3.10.8",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
+    "contextily>=1.0.0",
 ]
