@@ -39,8 +39,29 @@ hysoc/
 │       │   ├── segmentation/       # Module I: Grid Index & Stop Detector
 │       │   ├── stop_compression/   # Module II: Centroid Abstraction
 │       │   └── move_compression/   # Module III: SQUISH (Geom) & TRACE (Net)
+│       ├── simulation/         # Streaming Simulation (TrajectorySimulator)
 │       └── utils/              # Shared logic (Geometry, Map-Matching)
 │
 ├── tests/                      # Unit tests (pytest)
 ├── pyproject.toml              # Dependencies and project config (managed by uv)
 └── uv.lock                     # Exact version locking
+
+## 🚦 Streaming Simulator
+To verify algorithms in real-time without physical devices, HYSOC includes a **Trajectory Simulation** module.
+
+This module reads historical trajectory CSV files and replays them as a live stream of `Point` objects with updated timestamps. 
+
+**Quick Start:**
+See `notebooks/demo_simulation.ipynb` for a complete example.
+
+```python
+from hysoc.simulation import TrajectorySimulator
+
+# Initialize simulator (obj_id inferred from filename)
+sim = TrajectorySimulator("data/raw/subset_50/4325685.csv", interval=1.0)
+
+# Simulate device stream
+for point in sim.stream():
+    print(f"Received: {point}")
+    # Feed 'point' into HYSOC pipeline...
+```
