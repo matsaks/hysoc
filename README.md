@@ -65,3 +65,20 @@ for point in sim.stream():
     print(f"Received: {point}")
     # Feed 'point' into HYSOC pipeline...
 ```
+
+## 🛑 Stop Compression Demo
+To visualize the Stop Compression module (Module II) in action, you can run the provided demo script. This script performs the following steps:
+1.  **Loads** a real GPS trajectory from `data/raw/subset_50/`.
+2.  **Segments** the trajectory into Stops and Moves using `STSSOracleSklearn`.
+3.  **Compresses** the Stop segments into single centroids with start/end times.
+4.  **Visualizes** the result with a side-by-side map comparison (Raw vs. Compressed).
+
+**Run the demo:**
+```bash
+uv run scripts/demo_stop_compression.py
+```
+
+**Output:**
+The script saves the results to `data/processed/` with filenames based on the input trajectory ID:
+-   `compressed_output_[id].csv`: CSV file containing the compressed stream (Stop Centroids + Move Points).
+-   `stop_compression_demo_[id].png`: Visualization showing raw GPS points vs. the compressed trajectory.
