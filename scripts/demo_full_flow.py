@@ -17,6 +17,7 @@ from hysoc.core.segment import Segment, Stop, Move
 from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
 from hysoc.modules.stop_compression.compressor import StopCompressor, CompressedStop
 from hysoc.modules.move_compression.squish import SquishCompressor
+from hysoc.metrics import calculate_compression_ratio, calculate_sed_stats
 
 def load_trajectory(filepath: str) -> List[Point]:
     """
@@ -91,6 +92,46 @@ def main():
             processed_items.append(compressed_move)
 
     print(f"Compression complete. Result stream length: {len(processed_items)} items.")
+
+    # --- Calculate Metrics ---
+    print("Calculating evaluation metrics...")
+    
+    # Reconstruct compressed trajectory for SED calculation
+    # Stops are represented as 2 points (start, end) to correctly model the stay duration
+    compressed_trajectory_for_sed = []
+    
+    # Count actual stored points for compression ratio (1 per stop, N per move)
+    stored_points_count = 0
+    
+    for item in processed_items:
+        if isinstance(item, CompressedStop):
+            # For SED: Start and End of stop
+            p_start = Point(lat=item.centroid.lat, lon=item.centroid.lon, timestamp=item.start_time, obj_id=item.centroid.obj_id)
+            p_end = Point(lat=item.centroid.lat, lon=item.centroid.lon, timestamp=item.end_time, obj_id=item.centroid.obj_id)
+            compressed_trajectory_for_sed.extend([p_start, p_end])
+            
+            stored_points_count += 1
+            
+        elif isinstance(item, Move):
+            if not item.points:
+                continue
+            compressed_trajectory_for_sed.extend(item.points)
+            stored_points_count += len(item.points)
+            
+    # Calculate Metrics
+    # Ratio: Original Points / Stored Points
+    compression_ratio = len(trajectory) / max(1, stored_points_count)
+    
+    # SED Stats
+    sed_stats = calculate_sed_stats(trajectory, compressed_trajectory_for_sed)
+    
+    print(f"Metrics Calculated:")
+    print(f" - Compression Ratio: {compression_ratio:.2f}")
+    print(f" - Stored Points: {stored_points_count} (Original: {len(trajectory)})")
+    print(f" - Average SED: {sed_stats['average_sed']:.2f} m")
+    print(f" - Max SED: {sed_stats['max_sed']:.2f} m")
+    print(f" - RMSE: {sed_stats['rmse']:.2f} m")
+
 
     # 4. Save to CSV
     output_dir = os.path.join(project_root, "data", "processed")
@@ -253,6 +294,55 @@ def main():
     output_img = os.path.join(output_dir, f"full_flow_demo_{input_filename}.png")
     plt.savefig(output_img, dpi=300, bbox_inches='tight')
     print(f"Visualization saved to {output_img}")
+
+    # --- Plot 4: Metrics and Error Analysis (New Figure) ---
+    print("Generating metrics visualization...")
+    fig2 = plt.figure(figsize=(12, 10))
+    
+    # Layout: Top half for text, Bottom half for error plot
+    gs = fig2.add_gridspec(2, 1, height_ratios=[1, 2])
+    
+    # Text Axis
+    ax_text = fig2.add_subplot(gs[0])
+    ax_text.axis('off')
+    
+    text_str = (
+        f"Evaluation Metrics\n"
+        f"------------------\n"
+        f"Original Points: {len(trajectory)}\n"
+        f"Stored Points: {stored_points_count}\n"
+        f"Compression Ratio: {compression_ratio:.2f}:1\n\n"
+        f"SED Statistics\n"
+        f"--------------\n"
+        f"Average Error: {sed_stats['average_sed']:.2f} m\n"
+        f"Max Error: {sed_stats['max_sed']:.2f} m\n"
+        f"RMSE: {sed_stats['rmse']:.2f} m"
+    )
+    
+    ax_text.text(0.5, 0.5, text_str, ha='center', va='center', fontsize=14, family='monospace')
+    
+    # Error Plot Axis
+    ax_error = fig2.add_subplot(gs[1])
+    
+    errors = sed_stats.get('sed_errors', [])
+    if errors:
+        # Plot error vs index
+        ax_error.plot(errors, color='purple', alpha=0.7, linewidth=1)
+        ax_error.set_title("SED Error per Point")
+        ax_error.set_xlabel("Original Point Index")
+        ax_error.set_ylabel("Synchronized Euclidean Distance (m)")
+        ax_error.grid(True, linestyle='--', alpha=0.5)
+        
+        # Add mean line
+        ax_error.axhline(y=sed_stats['average_sed'], color='green', linestyle='--', label=f'Mean: {sed_stats["average_sed"]:.2f}m')
+        ax_error.legend()
+    else:
+        ax_error.text(0.5, 0.5, "No error data available.", ha='center', va='center')
+        
+    plt.tight_layout()
+    output_metrics_img = os.path.join(output_dir, f"full_flow_metrics_{input_filename}.png")
+    fig2.savefig(output_metrics_img, dpi=300, bbox_inches='tight')
+    print(f"Metrics visualization saved to {output_metrics_img}")
 
 if __name__ == "__main__":
     main()
