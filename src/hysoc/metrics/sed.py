@@ -23,7 +23,10 @@ def calculate_sed_error(p_original: Point, p_start: Point, p_end: Point) -> floa
         # If segment is a single point (or zero duration), distance is just geometric distance to start
         d_lat = p_original.lat - p_start.lat
         d_lon = p_original.lon - p_start.lon
-        return math.sqrt(d_lat*d_lat + d_lon*d_lon)
+        avg_lat = math.radians((p_original.lat + p_start.lat) / 2.0)
+        d_lat_m = d_lat * 111320.0
+        d_lon_m = d_lon * 111320.0 * math.cos(avg_lat)
+        return math.sqrt(d_lat_m*d_lat_m + d_lon_m*d_lon_m)
 
     # Calculate temporal ratio
     ratio = (t_orig - t_start) / (t_end - t_start)
@@ -32,11 +35,15 @@ def calculate_sed_error(p_original: Point, p_start: Point, p_end: Point) -> floa
     pred_lat = p_start.lat + (p_end.lat - p_start.lat) * ratio
     pred_lon = p_start.lon + (p_end.lon - p_start.lon) * ratio
     
-    # Calculate Euclidean distance
+    # Calculate Euclidean distance in meters
     d_lat = p_original.lat - pred_lat
     d_lon = p_original.lon - pred_lon
     
-    return math.sqrt(d_lat*d_lat + d_lon*d_lon)
+    avg_lat = math.radians((p_start.lat + p_end.lat) / 2.0)
+    d_lat_m = d_lat * 111320.0
+    d_lon_m = d_lon * 111320.0 * math.cos(avg_lat)
+    
+    return math.sqrt(d_lat_m*d_lat_m + d_lon_m*d_lon_m)
 
 def calculate_sed_stats(original: List[Point], compressed: List[Point]) -> Dict[str, float | List[float]]:
     """
@@ -79,7 +86,10 @@ def calculate_sed_stats(original: List[Point], compressed: List[Point]) -> Dict[
             p_ref = compressed[-1]
             d_lat = p.lat - p_ref.lat
             d_lon = p.lon - p_ref.lon
-            dist = math.sqrt(d_lat*d_lat + d_lon*d_lon)
+            avg_lat = math.radians((p.lat + p_ref.lat) / 2.0)
+            d_lat_m = d_lat * 111320.0
+            d_lon_m = d_lon * 111320.0 * math.cos(avg_lat)
+            dist = math.sqrt(d_lat_m*d_lat_m + d_lon_m*d_lon_m)
             sed_errors.append(dist)
             continue
             
@@ -91,7 +101,10 @@ def calculate_sed_stats(original: List[Point], compressed: List[Point]) -> Dict[
              # Sanity fallback, dist to start
             d_lat = p.lat - p_start.lat
             d_lon = p.lon - p_start.lon
-            dist = math.sqrt(d_lat*d_lat + d_lon*d_lon)
+            avg_lat = math.radians((p.lat + p_start.lat) / 2.0)
+            d_lat_m = d_lat * 111320.0
+            d_lon_m = d_lon * 111320.0 * math.cos(avg_lat)
+            dist = math.sqrt(d_lat_m*d_lat_m + d_lon_m*d_lon_m)
             sed_errors.append(dist)
             continue
             
