@@ -23,7 +23,8 @@ class TrajectoryStream:
             'lat': 'lat',
             'lon': 'lon',
             'timestamp': 'timestamp',
-            'obj_id': 'obj_id'
+            'obj_id': 'obj_id',
+            'road_id': 'osm_way_id'
         }
 
     def stream(self) -> Iterator[Point]:
@@ -31,7 +32,8 @@ class TrajectoryStream:
         Yields points from the stream one by one.
         """
         header = pd.read_csv(self.filepath, nrows=0, sep=self.sep)
-        has_id_col = self.mapping['obj_id'] in header.columns
+        has_id_col = self.mapping.get('obj_id') in header.columns
+        has_road_col = self.mapping.get('road_id') in header.columns
 
         with pd.read_csv(self.filepath, chunksize=1000, sep=self.sep) as reader:
             for chunk in reader:
@@ -42,6 +44,7 @@ class TrajectoryStream:
                         lat=row[self.mapping['lat']],
                         lon=row[self.mapping['lon']],
                         timestamp=row[self.mapping['timestamp']],
-                        obj_id=row[self.mapping['obj_id']] if has_id_col else self.default_obj_id
+                        obj_id=row[self.mapping['obj_id']] if has_id_col else self.default_obj_id,
+                        road_id=row[self.mapping['road_id']] if has_road_col else None
                     )
 

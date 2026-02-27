@@ -11,8 +11,9 @@ class Point:
     lon: float
     timestamp: datetime
     obj_id: str
+    road_id: str | int | None = None
 
     @property
     def tuple(self):
-        return (self.lat, self.lon, self.timestamp, self.obj_id)
+        return (self.lat, self.lon, self.timestamp, self.obj_id, self.road_id)
 

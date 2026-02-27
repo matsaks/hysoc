@@ -46,3 +46,6 @@ venv.bak/
 # Agent
 .agent
 .gemini
+
+# Data
+data/processed/
