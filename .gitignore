@@ -49,3 +49,6 @@ venv.bak/
 
 # Data
 data/processed/
+
+# Cache
+cache/
