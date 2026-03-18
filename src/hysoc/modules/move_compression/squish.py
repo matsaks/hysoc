@@ -9,6 +9,15 @@ class PriorityObject:
     priority: float
     index: int = field(compare=False)
 
+class Node:
+    def __init__(self, point: Point, index: int):
+        self.point = point
+        self.index = index
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+        self.priority = float('inf')
+        self.removed = False
+
 class SquishCompressor:
     def __init__(self, capacity: int = 50):
         """
@@ -38,15 +47,6 @@ class SquishCompressor:
         
         if len(points) <= target_capacity:
             return points
-
-        class Node:
-            def __init__(self, point: Point, index: int):
-                self.point = point
-                self.index = index
-                self.prev: Optional['Node'] = None
-                self.next: Optional['Node'] = None
-                self.priority = float('inf')
-                self.removed = False
 
         nodes: List[Node] = [Node(p, i) for i, p in enumerate(points)]
         
@@ -108,7 +108,7 @@ class SquishCompressor:
             
         return result
 
-    def _remove_node(self, node: 'Node', pq: List[PriorityObject]):
+    def _remove_node(self, node: Node, pq: List[PriorityObject]):
         node.removed = True
         prev_node = node.prev
         next_node = node.next

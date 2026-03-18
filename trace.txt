@@ -1,0 +1,2655 @@
+TRACE: Real-time Compression of Streaming Trajectories in
+Road Networks
+Tianyi Li§
+, Lu Chen†
+, Christian S. Jensen§
+, Torben Bach Pedersen§
+§Department of Computer Science, Aalborg University, Denmark
+†College of Computer Science, Zhejiang University, Hangzhou, China
+§
+{tianyi, csj, tbp}@cs.aau.dk †
+luchen@zju.edu.cn
+ABSTRACT
+The deployment of vehicle location services generates increasingly massive vehicle trajectory data, which incurs high storage
+and transmission costs. A range of studies target offline compression to reduce the storage cost. However, to enable online services
+such as real-time traffic monitoring, it is attractive to also reduce
+transmission costs by being able to compress streaming trajectories in real-time. Hence, we propose a framework called TRACE
+that enables compression, transmission, and querying of networkconstrained streaming trajectories in a fully online fashion. We
+propose a compact two-stage representation of streaming trajectories: a speed-based representation removes redundant information,
+and a multiple-references based referential representation exploits
+subtrajectory similarities. In addition, the online referential representation is extended with reference selection, deletion and rewriting functions that further improve the compression performance.
+An efficient data transmission scheme is provided for achieving low
+transmission overhead. Finally, indexing and filtering techniques
+support efficient real-time range queries over compressed trajectories. Extensive experiments with real-life and synthetic datasets
+evaluate the different parts of TRACE, offering evidence that it is
+able to outperform the existing representative methods in terms of
+both compression ratio and transmission cost.
+PVLDB Reference Format:
+Tianyi Li, Lu Chen, Christian S. Jensen, Torben Bach Pedersen. TRACE:
+Real-time Compression of Streaming Trajectories in Road Networks.
+PVLDB, 14(7): 1175-1187, 2021.
+doi:10.14778/3450980.3450987
+1 INTRODUCTION
+Massive volumes of vehicle trajectories are being accumulated at
+an unprecedented scale with the proliferation of GPS-enabled devices and mobile internet connectivity. This yields high storage and
+transmission costs for trajectories. Hence, trajectory compression
+that addresses these aspects has attracted attention [3–5, 8, 11, 13,
+16, 17, 19, 27, 31–33, 41, 44, 45]. However, most existing studies target offline compression [11, 13, 16, 17, 19, 32, 33, 41, 44, 45]. They
+generally compress an entire trajectory after all the GPS points
+are collected, which may not be realistic for resource-constrained
+This work is licensed under the Creative Commons BY-NC-ND 4.0 International
+License. Visit https://creativecommons.org/licenses/by-nc-nd/4.0/ to view a copy of
+this license. For any use beyond those covered by this license, obtain permission by
+emailing info@vldb.org. Copyright is held by the owner/author(s). Publication rights
+licensed to the VLDB Endowment.
+Proceedings of the VLDB Endowment, Vol. 14, No. 7 ISSN 2150-8097.
+doi:10.14778/3450980.3450987
+Edge Server
+Centralized
+Cloud
+Edge Server
+SRSU SRSU
+Smart Vechicles
+Smart Vechicle Layer
+Edge Server Layer
+Centralized Cloud Layer
+Figure 1: Vehicular edge computing architecture.
+GPS-enabled devices. In particular, offline compression incurs high
+communication overheads or data loss because the data needs to be
+transmitted to the location where the compression is performed. In
+contrast, with online compression, GPS points are compressed as
+they arrive in real-time, thus enabling a broader range of applications, while saving both storage and transmission costs [3, 4, 21, 27].
+To enable compression on diverse devices with variable computing capabilities, we employ vehicular edge computing (VEC) to
+compress trajectories in real-time [3]. A VEC architecture has three
+layers: a smart vehicle layer, an edge server layer, and a centralized
+cloud layer [29], as shown in Figure 1. The smart vehicle layer
+delivers raw GPS data to the edge server layer that encompasses
+software-defined networking (SDN) based roadside units (SRSUs),
+which possess the computational and storage capabilities needed
+for trajectory compression. The centralized cloud layer collects and
+stores the compressed trajectories from the edge server layer to
+provide multiple services.
+Although several studies [3–5, 31] consider online networkconstrained trajectory compression, two challenges remain to be
+tackled. The first challenge is how to obtain a concise and accurate
+representation of trajectories. Existing studies obtain a compact representations in part by discarding information [3–5, 31], e.g., the
+exact locations of trajectories. This renders the resulting trajectories inaccurate and reduces their usability. The second challenge is
+how to compress trajectories in real-time with low transmission costs.
+Some previous proposals for streaming trajectory compression rely
+on offline training of prediction models using historical data, enabling them to omit data that can be predicted within a certain error
+bound [5, 31]. However, movement patterns on even the same road
+vary across time [12, 24], necessitating frequent re-training and
+incurring high transmission cost for delivering re-trained models.
+To address the above two challenges, we propose a new framework for online TRAjectory ComprEssion (TRACE). The goals of
+1175
+TRACE are to achieve high compression ratios and low transmission costs with acceptable time delays. To realize these, we first
+present a speed-based trajectory representation on the basis of
+UTCQ [19]. This representation removes redundant information
+while enabling decompression of trajectories by capturing growth
+rates of accumulative distances and vehicle speeds. Further, as existing studies indicate that subtrajectories from different streaming
+trajectories are likely to exhibit co-movement patterns during the
+same time periods [12], we make it possible to exploit the similarity
+between subtrajectories from different streaming trajectories by
+means of so-called referential compression. Next, we develop an
+effective online referential representation and a reference selection technique based on so-called 𝑘-mer matching, which employs
+hashing to identify matching subsequences [25]. To keep memory
+consumption low, we design a reference deletion algorithm that
+removes references that have not been used for some time. To be
+able to adapt to variable movement patterns, we present a reference
+rewriting algorithm that updates the references in real-time. Further, we provide a real-time data transmission scheme that targets
+low-overhead transmission of trajectory data. Finally, we develop
+an index structure and filtering techniques that facilitate real-time
+range querying of compressed trajectories.
+In summary, our main contributions are as follows:
+• We propose a new real-time streaming vehicle trajectory
+compression, transmission, and querying framework. To the
+best of our knowledge, this is the first such framework that
+does not depend on offline training and discard any data.
+• We develop a concise speed-based representation and a 𝑘-
+mer matching based referential representation that use multiple references to capture the similarities between subtrajectories. A reference selection technique and reference deletion
+and rewriting functions are provided that further improve
+compression performance.
+• We provide an effective data transmission scheme that reduces transmission overhead and supports decoding at the
+centralized cloud. We also propose an index structure and
+filtering techniques to accelerate real-time query processing.
+• Extensive experiments offer insight into the workings of the
+different parts of the framework and show that it is able to
+outperform three baselines in terms of compression ratio
+and transmission cost.
+The rest of the paper is organized as follows. We present preliminaries in Section 2 and give an overview of the proposed framework
+in Section 3. Section 4 details the representation. Section 5 presents
+the encoding and transmission schemes, and Section 6 covers the
+index structure and query processing. Section 7 reports the experimental results. Section 8 reviews related work, and Section 9
+concludes and offers directions for future work.
+2 PRELIMINARIES
+We proceed to introduce preliminary definitions and algorithms.
+Table 1 summarizes frequently used notation.
+2.1 Data Model
+A raw trajectory is a series of raw GPS points 𝑝 = ( (𝑥, 𝑦), 𝑡),
+where 𝑥 is longitude, 𝑦 is latitude, and 𝑡 is a timestamp. Tp1 =
+Table 1: Frequently used notation.
+Notation Description
+Tr a set of streaming trajectories
+Tr𝑛 a streaming trajectory in Tr
+𝑙𝑖 the 𝑖
+𝑡ℎ mapped GPS point
+sp(Tr𝑛) the path traversed by Tr𝑛
+ad(Tr𝑛) the accumulative distance sequence of Tr𝑛
+t(Tr𝑛) the time sequence of Tr𝑛
+SV(Tr𝑛) the start vertex of Tr𝑛
+E(Tr𝑛) the outgoing edge number sequence of Tr𝑛
+RD(Tr𝑛) the first relative distance of Tr𝑛
+GD(Tr𝑛) the growth rates of accumulative distances of Tr𝑛
+V(Tr𝑛) the speed sequence of Tr𝑛
+E(Tr𝑛) [𝑖] the 𝑖
+𝑡ℎ outgoing edge number of E(Tr𝑛)
+E(Tr𝑛
+𝑖
+) the outgoing edge numbers arriving at t(Tr𝑛) [𝑖]
+Ref a reference streaming trajectory
+Nref a non-reference streaming trajectory
+Com𝜙 (Nref) the referential representation of Nref
+𝐺𝑜 the reference set at timestamp 𝑡𝑜
+𝐺𝑜 [𝑖].𝑓 the freshness of the 𝑖
+𝑡ℎ reference in 𝐺𝑜
+𝐺𝑜 [𝑖].tl the latest visiting timestamp of the 𝑖
+𝑡ℎ reference in 𝐺𝑜
+𝐹𝑜 the sum of freshness of references in 𝐺𝑜
+FA a factor matrix
+𝑠𝑒𝑞ˆ the binary code of a sequence 𝑠𝑒𝑞
+⟨𝑝0, · · · , 𝑝7⟩ in Figure 2a is an example of a raw trajectory. A
+road network is modeled as a directed spatial graph 𝐺 = (𝑉 , 𝐸),
+where 𝑉 is a set of geo-located vertices 𝑣 denoting intersections
+or end points, and 𝐸 is a set of directed edges 𝑒 = (𝑣𝑖 → 𝑣𝑗).
+Figure 2 gives a road network example. A mapped GPS point
+𝑙 is a network-constrained point in a road network 𝐺 obtained
+by map-matching [34]. It is represented as ( (𝑣𝑖 → 𝑣𝑗), nd(𝑣𝑖
+,𝑙), 𝑡),
+where nd(𝑣𝑖
+,𝑙) is the network distance between 𝑣𝑖 and 𝑙 on the edge
+(𝑣𝑖 → 𝑣𝑗) and 𝑡 is a timestamp. In Figure 2a, 𝑙0 = ( (𝑣0 → 𝑣1), 50,
+7:03:25) is a mapped GPS point. We also denote a mapped GPS point
+as ( (𝑣𝑖 → 𝑣𝑗), nd(𝑣𝑖
+,𝑙)) when the timestamp 𝑡 is not considered.
+Definition 1. Given two vertices 𝑣𝑠 and 𝑣𝑒 in a road network 𝐺,
+a path 𝑠𝑝 is a sequence of connected edges (𝑣𝑖 → 𝑣𝑗) that starts from
+𝑣𝑠 and ends at 𝑣𝑒 , i.e., 𝑠𝑝 = ⟨(𝑣𝑠 → 𝑣0), · · · , (𝑣𝑛−1 → 𝑣𝑒 )⟩.
+Definition 2. A streaming network-constrained trajectory
+Tr𝑛
+is modeled as an infinite, time-ordered sequence of mapped GPS
+points 𝐿
+𝑛 with an infinite path sp(Tr𝑛
+) traversed by Tr𝑛
+.
+Figure 2 gives an example of a set Tr = {Tr1
+, Tr2
+, Tr3
+} of three
+streaming network-constrained trajectories, where, e.g., sp(𝑇 𝑟 1
+) =
+⟨(𝑣0 → 𝑣1), · · · , (𝑣11 → 𝑣12), · · · ⟩ and 𝐿
+1 = {𝑙0,𝑙1, · · · ,𝑙7, · · · }. Tr
+uses two road-network distances as defined next.
+Definition 3. The accumulative distance of a streaming trajectory Tr𝑛 at its 𝑖
+𝑡ℎ timestamp 𝑡(Tr𝑛
+) [𝑖], denoted as ad(Tr𝑛
+) [𝑖], is
+the network distance nd(𝑣𝑠 ,𝑙𝑖) along the path (𝑣𝑠 → 𝑣𝑒 ), · · · , (𝑣𝑠
+∗ →
+𝑣𝑒
+∗ ), where 𝑙𝑖
+is located on (𝑣𝑠
+∗ → 𝑣𝑒
+∗ ) and (𝑣𝑠 → 𝑣𝑒 ) is the first
+edge traversed by Tr𝑛
+. The accumulative distance sequence ad(𝑇 𝑟𝑛
+)
+of a streaming trajectory Tr𝑛
+contains the trajectory’s accumulative
+distance at each timestamp.
+Definition 4. Given a mapped GPS point ( (𝑣𝑠 → 𝑣𝑒 ), nd(𝑣𝑠 ,𝑙)),
+the relative distance rd of 𝑙 w.r.t. (𝑣𝑠 → 𝑣𝑒 ) is the ratio of nd(𝑣𝑠 ,𝑙)
+to the length of (𝑣𝑠 → 𝑣𝑒 ) (denoted as | (𝑣𝑠 → 𝑣𝑒 )|).
+In Figure 2a, given nd(𝑣0,𝑙1) = 150, we have ad(Tr1
+) [1] = 150.
+Given | (𝑣0 → 𝑣1)| = 100, rd of 𝑙0 w.r.t. (𝑣0 → 𝑣1) is 0.5. In the
+1176
+v13
+v0 v1
+v14 v3
+v5 v4
+v7 v10
+v15
+v16
+l1 l0
+l2 0
+l3
+v11
+l4
+v2
+v3
+v4
+v7 v10 v11
+v15
+v16
+v17
+v18
+l0 l1
+l2
+l3
+l4
+l5
+l6
+l7
+l8
+4 4 1
+2 1
+2 2 2
+3
+2 2 1
+1
+1
+2 2 2
+3
+3
+3
+p0=(120.14514, 30.34056, 7:03:25)
+p1=(120.14511, 30.34152, 7:03:45)
+p2=(120.14549, 30.34228, 7:04:06)
+p3=(120.14546, 30.34236, 7:04:26)
+p4=(120.14559, 30.34253, 7:04:46)
+p5=(120.14552, 30.34256, 7:05:05)
+p6=(120.14510, 30.34258, 7:05:30)
+p7=(120.14510, 30.34259, 7:05:50)
+(b) (c)
+7
+l9
+l5
+l6
+v17
+3
+v1 v2
+v3
+v5 v4
+v6
+v7
+v8 v9
+v10
+1
+p2
+l1
+l2
+p1
+l4 p4
+l3 p3
+l5
+p5
+p6 l6
+v0
+p0
+l0
+2 2
+1
+1
+4
+2 1
+2
+2
+3
+3
+(a)
+1
+50
+v11
+v12 8
+
+Tr1 Tr2 Tr
+3
+Tr1
+.l0
+Tr2
+.l0
+7:03:25
+Tr3
+.l0
+7:03:35
+Tr1
+.l1
+7:03:45 7:03:55 7:04:05 7:04:15 7:04:25 7:04:35 7:04:45 7:04:55 7:05:05 7:05:15 7:05:25 7:05:35 7:05:45 7:05:55
+2 Tr .l1
+Tr3
+.l1 Tr1
+.l2
+2 Tr .l2
+Tr3
+.l2 Tr1
+.l3
+2 Tr .l3
+2 Tr .l4
+Tr3
+.l3 Tr1
+.l4 Tr3
+.l4 Tr1
+.l5
+2 Tr .l5
+Tr3
+.l5 Tr1
+.l6
+2 Tr .l6
+Tr
+3
+.l6 Tr
+3
+.l7
+7:06:05
+Tr
+3
+.l8
+(d) Time line of Tr, Tr and Tr 1 2 3
+Tr
+3
+.l9
+7:06:15 7:06:25 7:06:35
+p7
+p
+l7
+Tr
+1
+.l7
+100
+Figure 2: A streaming network-constrained trajectory set Tr = {Tr1
+, Tr2 and Tr3
+}.
+rest of the paper, we simply use “trajectory” instead of “networkconstrained trajectory” when this does not cause ambiguity.
+2.2 UTCQ Representation
+Trajectory representation transforms network-constrained trajectories into a format with small entropy to achieve a high compression ratio [11, 13, 16, 19, 32, 41]. The UTCQ representation [19] is
+designed for compressing uncertain trajectories. Due to the uncertainty, a raw trajectory can be transformed to multiple trajectory
+instances by probabilistic map-matching [2]. UTCQ first adapts
+the representative trajectory representation TED [41] to express a
+trajectory instance Tr𝑛
+as a start vertex SV(Tr𝑛
+), an edge sequence
+𝐸(Tr), a relative distance sequence 𝐷(Tr), a time flag bit-string
+𝑇
+′
+(Tr), and a timestamp sequence 𝑇 (Tr).
+Example 1. Assuming that the default sample interval of Tr in Figure 2 is 20s, the UTCQ representation of Tr1
+is i) SV(Tr1
+) = 44183; ii)
+𝐸(Tr1
+) = ⟨2, 2, 1, 1, 4, 1, 2, 1, 2, 3, 2, 3, 0⟩; iii)𝐷(Tr1
+) = ⟨0.5, 0.5, 0.5, 0.5,
+0.5, 0.5, 0.5, 0.75⟩; iv)𝑇
+′
+(Tr1
+) = ⟨1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1⟩ and v)
+𝑇 (Tr1
+) = ⟨7:03:25, 0, 1, 0, 0, −1, 5, 0⟩. The single 0 and the last 3 (3
+is the outgoing edge number of (𝑣11 → 𝑣12) w.r.t. 𝑣11) in 𝐸(Tr1
+)
+indicate that (𝑣11 → 𝑣12) has two mapped GPS points, 𝑙6 and 𝑙7.
+𝑇
+′
+(Tr) is introduced to map relative distances in 𝐷(Tr) to outgoing
+edge numbers in 𝐸(Tr) for decompression [41].
+Next, UTCQ exploits the similarity between trajectory instances
+of a single uncertain trajectory and provides referential representations for the edge sequence 𝐸(Tr), the distance sequence 𝐷(Tr),
+and the time flag bit-string 𝑇
+′
+(Tr). It encodes the differences of an
+input sequence w.r.t. a reference sequence. (i.e., the more similar
+the sequences are, the higher the compression ratio) [9, 38, 39].
+Definition 5. Given an input sequence 𝜙 (Nref) (also called a
+non-reference) and its corresponding reference 𝜙 (Ref), 𝜙 (Nref) can be
+represented as a list of 𝑊 factors, i.e., Com𝜙 (Nref) = ⟨𝜙 (Ma𝑤)|0 ≤
+𝑤 < 𝑊 ⟩, where a factor 𝜙 (Ma𝑤) denotes a subsequence in 𝜙 (Nref).
+Here, 𝜙 identifies the to-be-represented sequence of a trajectory.
+For example, Com𝐸 (Nref) is the referential representation of the
+edge sequence 𝐸(Nref). UTCQ adopts the (𝑆, 𝐿, 𝑀) format to encode
+each factor in Com𝜙 (Nref). Specifically, 𝑆 is the start position of the
+subsequence in the reference, 𝐿 is the length of the subsequence, and
+𝑀 is the first mis-matched character following the subsequence. For
+example, in Figure 2, we have 𝐸(Tr2
+) = ⟨4, 4, 1, 2, 1, 2, 2, 2, 3, 0, 3⟩ and
+𝐸(Tr3
+) = ⟨2, 2, 1, 1, 1, 2, 2, 2, 3, 0, 3, 3⟩. Let Tr3 be a non-reference Nref
+and Tr2 be its corresponding reference Ref. We get Com𝐸 (Nref) =
+⟨(5, 2, 1), (2, 1, 1), (5, 6, 3)⟩. Note that UTCQ only assigns one reference to each non-reference.
+2.3 k-mer Matching
+Developed for genome sequences, 𝑘-mer matching is an effective
+strategy for high-speed referential compression [25].
+Definition 6. A k-mer 𝜙
+𝑛
+𝑖
+is a subsequence of fixed length 𝑘 of
+𝜙 (Tr𝑛
+), i.e., 𝜙
+𝑛
+𝑖
+= {𝜙 (Tr𝑛
+) [𝑖], 𝜙 (Tr𝑛
+) [𝑖 + 1], ..., 𝜙 (Tr𝑛
+[𝑖 + 𝑘 − 1])}.
+Given a reference 𝜙 (Ref) and a non-reference 𝜙 (Nref), 𝑘-mer
+matching employs a hash table𝐻, to efficiently obtain the referential
+representation Com𝜙 (Nref). Each factor of Com𝜙 (Nref) is of the
+form (𝑆, 𝐿, 𝑀), where 𝐿 is the length of the matched subsequence.
+We highlight that 𝑘 is different from 𝐿; thus, 𝑘 is kept fixed during
+compression. To be specific, for a reference 𝜙 (Ref), 𝑘-mer matching
+first computes the hash key of each 𝑘-mer in 𝜙 (Ref) by a given
+hash function. Next, each 𝑘-mer is stored with its start position 𝑆 in
+𝜙 (Ref) in 𝐻. For a non-reference 𝜙 (Nref), 𝑘-mer matching greedily
+finds the longest prefix of 𝜙 (Nref) that exists in 𝜙 (Ref) with the
+help of 𝐻. In particular, it calculates the hash key of each 𝑘-mer
+in 𝜙 (Nref) and checks whether a matched subsequence exists in
+𝐻. If it exists, it continues to match the subsequent characters in
+𝜙 (Nref) and 𝜙 (Ref) until an un-matched character 𝑀 occurs. The
+procedure implies that 𝐿 can be an arbitrary value with 𝐿 ≥ 𝑘,
+meaning that 𝑘 can remain fixed during compression. It also means
+that the correctness of 𝑘-mer matching is un-affected by 𝑘.
+Example 2. Consider 𝐸(Tr1
+) as a reference and 𝐸(Tr3
+) as a nonreference. Assuming that the current timestamp is 7:04:55, we have
+four 𝑘-mers for 𝐸(Tr1
+), i.e., 𝐸
+1
+0
+= (2, 2, 1), 𝐸
+1
+1
+= (2, 1, 1), 𝐸
+1
+2
+= (1, 1, 4),
+and 𝐸
+1
+3
+= (1, 4, 1), each of which is mapped to a hash table with its
+corresponding start position in 𝐸(Tr1
+). To find the longest prefix of
+𝐸(Tr3
+) in 𝐸(Tr1
+), we get the first 𝑘-mer of 𝐸(Tr3
+), i.e., 𝐸
+3
+0
+= ⟨2, 1, 1⟩,
+and finds 𝐸
+1
+0
+= 𝐸
+3
+0
+in the hash table; then we greedily match the
+subsequent characters of both 𝐸
+3
+0
+and 𝐸
+1
+0
+until the first mis-matched
+character (i.e., 𝐸(Tr3
+) [4] = 1) occurs. Thus, we obtain a factor (0, 4, 1),
+where 0 is the offset of 𝐸
+1
+0
+[0] in 𝐸(Tr1
+). After that, we remove the
+subsequence represented by (0, 4, 1) from 𝐸(Tr3
+). Since 𝐸(Tr3
+) = ∅,
+the 𝑘-mer matching stops.
+Note that 𝑘 is a pre-defined and fixed value that only constrains the initial length of a matched subsequence. We adapt 𝑘-mer
+1177
+Speed-based
+representation
+Referential
+representation
+Trajectory
+Representor
+T(Tr)
+7:03:25
+... 0
+...
+GD(Tr)
+... 0.67
+...
+V(Tr)
+... 5
+...
+∅
+SV(Tr)
+44183
+...
+...
+k-mers
+<5,5,5>
+<7,17,9>
+...
+k-mers
+<2,2,1>
+<4,4,1>
+...
+E(Tr)
+2
+...2
+...
+RD(Tr)
+0.5
+...
+...
+k-mers
+<2,2,1>
+...
+k-mers
+<2,2,3>
+...
+Reference
+deletion
+Reference
+k-mer matching rewriting
+based reference selection
+Encoding and
+data transmission
+S1
+(1,0,3)
+0000010
+...
+S2
+1
+1
+...
+...
+...
+...
+...
+S3
+1
+001
+...
+States
+Representation
+Binary codes
+...
+( ) Com Tr E
+( ) Com Tr V
+Query processing
+Compressed
+trajectories
+Index
+100
+... Trajectory
+Compressor
+Query Processor
+Edge
+Server Layer
+Compressed trajectories
+and index information
+Decompress
+T(Tr)
+Filtering
+technique
+DecompressQuery
+results
+Centralized
+Cloud Layer
+Com Tr ( ) φ
+∅
+∅ ∅
+Figure 3: TRACE framework.
+matching to streaming settings and detail how to select references
+and referentially compress trajectories in real-time.
+3 TRACE FRAMEWORK
+The framework enables the online compression and subsequent
+querying of streaming network-constrained trajectories (NCTs). It
+takes a set Tr = {Tr𝑛
+|1 ≤ 𝑛 ≤ 𝑁} of streaming trajectories as input.
+Each Tr𝑛
+contains i) the streaming path sp(Tr𝑛
+) traversed by Tr𝑛
+, ii)
+a streaming sequence of accumulative distances ad(Tr𝑛
+), and iii) a
+streaming time sequence t(Tr𝑛
+). Figure 3 depicts the TRACE framework that encompasses three components: a trajectory representor,
+a trajectory compressor, and a query processor. We deploy TRACE
+at the edge server and the centralized cloud layers of VEC. Raw GPS
+points are delivered from the smart vehicle layer to the edge server
+layer, where they are transformed to mapped GPS points using
+map-matching [34]. We do this to support smart vehicle layers with
+limited computational capabilities [4], thus extending the applicability. While the cost of data transmission from the smart vehicle layer
+to the edge server layer equals the size of the raw trajectories, this
+transmission is relatively efficient and scalable, because the edge
+server layer is geographically closer to the smart vehicle layer than
+to the centralized cloud layer, reducing the wireless communication
+energy consumption and the network load [20, 29].
+Edge Server Layer. The trajectory representor converts the
+NCTs into speed-based and referential representations. In particular, we propose to use speed information to identify the mapped
+GPS point to achieve a compact representation format. Then, we
+apply the referential representation in [19] to exploit the similarities among subtrajectories and multiple references to achieve a
+high compression ratio, with the details presented in Sections 4.1
+and 4.2. To select references and to represent non-references in
+online scenarios, we adopt 𝑘-mer matching [25]. Specifically, two
+hash tables are used to store the reference sets E(Ref) and V(Ref)
+for fast retrieval. Reference deletion and rewriting functions are
+provided that make it possible to update the tables efficiently. The
+former enables deleting infrequent sequences to reduce the storage
+cost, while the latter updates references using frequent sequences
+to improve the compression ratio. The detailed algorithms are covered in Sections 4.3–4.5. In the sequel, the trajectory compressor
+compresses the references and non-references into binary codes.
+A scheme for transmitting binary codes is also presented, which
+enables the centralized cloud to decode binary codes without extra
+information. The details are provided in Section 5.
+Centralized Cloud Layer. The query processor is located at
+the centralized cloud and operates on compressed trajectories. It
+has an online range query algorithm that exploits indexing and
+filtering to achieve efficiency, to be detailed in Section 6.
+4 REPRESENTATION
+We proceed to detail the representation of streaming trajectories.
+4.1 Speed-based Representation
+Existing works show that objects moving on the same road during
+the same time period tend to have a similar speed trend [12]. This
+motivates us to transfer the accumulative distances of trajectories to
+speeds and apply the referential representation to them. However,
+the reference speed sequence is difficult to compress substantially
+due to its wide range [41]. We tackle this challenge by developing
+the following representation.
+ad(Tr) → (RD(Tr), GD(Tr), V(Tr)). We represent accumulative distances as a sequence of growth rates (denoted as GD(Tr))
+following the first relative distance of Tr (denoted as RD(Tr)). The
+growth rate of the accumulative distance at T(Tr) [𝑖], denoted as
+GD(Tr) [𝑖] (𝑖 > 0), is calculated by ad(Tr) [𝑖]−ad(Tr) [𝑖−1]
+ad(Tr) [𝑖]−ad(Tr) [𝑖−2]
+(𝑖 > 1).
+Further, GD(Tr) [1] =
+ad(Tr) [1]−ad(Tr) [0]
+ad(Tr) [1]
+. For example in Figure 2a,
+given ad(Tr1
+) [0] = 50, ad(Tr1
+) [1] = 150 and ad(Tr1
+) [2] = 250, we
+have GD(Tr1
+) [1] = 0.67 and GD(Tr1
+) [2] = 0.5. V(Tr) is a sequence
+of speeds. The speed at𝑡(Tr) [𝑖] is calculated by ad(Tr) [𝑖]−ad(Tr) [𝑖−1]
+𝑡 (Tr) [𝑖]−𝑡 (Tr) [𝑖−1]
+(𝑖 > 0), denoted as V(Tr) [𝑖]. Given T(Tr), both GD(Tr) and V(Tr)
+are able to identify ad(Tr). Thus, we only store one of them, to be
+detailed in Section 4.2.
+sp(Tr) → (SV(Tr), E(Tr)) & t(Tr) → T(Tr). We adopt UTCQ
+[19] to represent a path sp(Tr) as SV(Tr) followed by 𝐸(Tr) and
+a time sequence t(Tr) as T(Tr). We use the UTCQ representation
+because it is the state-of-the-art referential compression framework
+for network-constrained trajectories and exhibits high compression
+ratios. Note that, since both GD(Tr) and V(Tr) enable decompressing trajectories without T
+′
+(Tr) and the “0” in 𝐸(Tr) used in UTCQ
+representation, we omit them to achieve a more compact format.
+Overall, the speed-based representation expresses Tr as a tuple (SV(Tr), E(Tr), RD(Tr), GD(Tr), V(Tr), T(Tr)). Table 2 shows an
+example representation for Tr in Figure 2.
+4.2 Representation with Multiple-References
+Based on the representation introduced in Section 4.1, we apply referential compression [19] to sub-trajectories from different streaming trajectories. Due to the use of multiple references, we modify
+the (𝑆, 𝐿, 𝑀) format [19] as (ref𝑖𝑑, 𝑆, 𝐿, 𝑀), where ref𝑖𝑑 is the ID of
+the reference. For example, the referential representation of 𝐸(Tr3
+)
+w.r.t. 𝐸(Tr1
+) and 𝐸(Tr2
+) is Com𝐸 (Tr3
+) = ⟨(1, 0, 4, 1), (2, 5, 5, 3)⟩.
+Different from the outgoing edge numbers, the speeds are unlikely to be exactly the same. Therefore, we consider 𝑉 (Tr𝑛
+) [𝑖] ≈
+𝑉 (Tr𝑛
+′
+) [𝑖
+′
+] if 𝑉¥(Tr𝑛
+) [𝑖] = 𝑉¥(Tr𝑛
+′
+) [𝑖
+′
+], where 𝑉¥(Tr𝑛
+) [𝑖] is the integer closest to 𝑉 (Tr𝑛) [𝑖]
+0.5
+𝜂 and 𝜂 is the speed error bound. A larger
+𝜂 yields a more accurate compression at the expense of the compression ratio. If 𝑉 (Tr) is a non-reference, we record GD(Tr) [𝑖] if
+1178
+Table 2: Speed-based representation of Tr in Figure 2.
+𝑛 1 2 3
+SV(Tr𝑛) 44183 27444 44183
+𝐸(Tr𝑛) ⟨2, 2, 1, 1, 4, 1, 2, 1, 2, 3, 2, 3⟩ ⟨4, 4, 1, 2, 1, 2, 2, 2, 3, 3⟩ ⟨2, 2, 1, 1, 1, 2, 2, 2, 3, 3, 3⟩
+RD(Tr𝑛) 0.5 0.05 0.25
+GD(Tr𝑛) ⟨0.67, 0.5, 0.5, 0.67, 0.33, 0.83, 0.05⟩ ⟨0.97, 0.69, 0.35, 0.53, 0.11, 0.75⟩ ⟨0.8, 0.5, 0.5, 0.5, 0.64, 0.53, 0.11, 0.75, 0.67⟩
+V(Tr𝑛) ⟨5, 4.76, 5, 10, 5.26, 20, 1.25⟩ ⟨6.9, 17.11, 8.75, 10, 1.25, 3.75⟩ ⟨5, 5, 5, 5, 8.75, 10, 1.25, 3.95, 7.5⟩
+T(Tr𝑛) ⟨7:03:25, 0, 1, 0, 0,-1, 5, 0⟩ ⟨7:03:30, 1,-1, 0, 0, 0, 0⟩ ⟨7:03:35, 0, 0, 0, 0, 0, 0, 0,-1, 0⟩
+...
+86
+24...
+25
+877...
+1 4 null
+996
+985
+954 <1> 1 1 985 ... ...
+955
+969 <4,4,1> 2 0 877
+...
+986
+987... ...
+...
+996
+<2> 2 3 24 25
+null
+<2,2,1> 1 0 null 954
+<2> 2 5 25 987
+<3> 2 6 986 null
+<4> 954 1 2 86
+<1> 2 2 877 955
+<2> 2 4 955 986
+<1> 1 3 996 877
+<2> 2 1 969 24
+86
+Figure 4: A hash table H constructed according to E(Tr) in
+Table 2 at 7:05:06, where k=3.
+V(Tr) [𝑖] is a mis-matched value w.r.t. its reference; otherwise, we
+store GD(Tr) instead of V(Tr). This is because V(Tr) [𝑖] (∈ [0, 𝜇])
+can only achieve the same compression as GD(Tr) [𝑖] (∈ [0, 1)) at
+the cost of compression accuracy, where 𝜇 is a speed constraint
+of the road network. Taking V(Tr1
+) and V(Tr2
+) as references and
+given 𝜂 = 0, we have Com𝑉 (Tr3
+) = ⟨(1, 0, 3, 0.5), (2, 2, 4, 0.67)⟩.
+4.3 Reference Selection for E(Tr𝑛
+)
+We introduce the real-time reference selection technique based
+on 𝑘-mer matching. Note that, we only decompose 𝐸(Tr𝑛
+) and
+𝑉 (Tr𝑛
+) into 𝑘-mers, i.e., 𝜙 = 𝐸 or 𝑉 , as we only apply referential
+representation to them.
+Definition 7. The subsequence of 𝐸(Tr) of a streaming trajectory
+Tr arriving at 𝑡(Tr) [𝑗] (𝑗 > 0), is denoted as 𝐸(Tr𝑗) (𝑗 > 0). It starts
+from the edge traversed by Tr immediately after leaving the last edge
+of 𝐸(Tr𝑗−1) and ends at the edge where Tr is located at 𝑡(Tr) [𝑗].
+Specifically, 𝐸(Tr0) is the outgoing edge number of (𝑣𝑠 → 𝑣𝑒 )
+w.r.t. 𝑣𝑠 , where (𝑣𝑠 → 𝑣𝑒 ) is the first edge traversed by Tr. For
+example, in Figure 2a, we have 𝐸(Tr1
+4
+) = ⟨4, 1⟩ because (𝑣4 → 𝑣5)
+is traversed by Tr1
+after leaving (𝑣3 → 𝑣4) and 𝑙4 is located on
+(𝑣5 → 𝑣6) at 𝑇 (Tr1
+) [4].
+We construct a hash table 𝐻 for 𝐸(Tr𝑛
+), whose cardinality (i.e.,
+number of hash entries) is pre-defined and fixed. Each 𝑘-mers in 𝐻
+is stored as a tuple (𝐸
+𝑛
+𝑖
+, 𝑛, off𝑖
+, pt𝑖
+, pd𝑖
+), where i) 𝐸
+𝑛
+𝑖
+is the 𝑖
+th 𝑘-mer
+of 𝐸(Tr𝑛
+); ii) 𝑛 is the ID of Tr𝑛
+; iii) off𝑖
+is the offset of 𝐸
+𝑛
+𝑖
+[0] in
+𝐸(Tr𝑛
+), and iv) pt𝑖
+and pd𝑖
+are the indexes of the entries associated
+with 𝐸
+𝑛
+𝑖−1
+and 𝐸
+𝑛
+𝑖+1
+in 𝐻, respectively. Figure 4 gives an example of
+the hash table constructed according to the streaming trajectories
+in Table 2, where BKDR hashing is adopted due to its high efficiency
+and good distribution capability [40]. To save space, we only store
+𝐸
+𝑛
+𝑖
+[𝑘 − 1] (𝑖 > 0) instead of 𝐸
+𝑛
+𝑖
+in the hash table because the whole
+𝑘-mer can be retrieved by pt𝑖
+. For example, the entry associated
+with 𝐸
+1
+1
+(= (2, 1, 1)) in 𝐻 is stored as (⟨1⟩, 1, 1, 985, 996), where 985
+and 996 are the indexes of 𝐸
+1
+0
+and 𝐸
+1
+2
+of Tr1
+in 𝐻, respectively.
+A𝑘-mer does not form until |𝐸(Tr𝑛
+𝑚)∪𝐸(Tr𝑛
+𝑚+1
+)∪· · ·∪𝐸(Tr𝑛
+𝑚+𝑗
+)|
+≥ 𝑘. For example given 𝑘 = 3, 𝐸
+1
+0
+is formed at 𝑡(Tr) [2] =7:04:06,
+as 𝐸(Tr1
+0
+) ∪ 𝐸(Tr1
+1
+) ∪ 𝐸(Tr1
+2
+) = ⟨2, 2, 1⟩. Once the first 𝑘-mer 𝐸
+𝑛
+0
+of
+𝐸(Tr𝑛
+) is formed, we hash it to hash table 𝐻 according to its hash
+key, denoted as key.
+1) If 𝐻 [key] = ∅, 𝐸
+𝑛
+0
+cannot be referentially represented by the
+existing 𝑘-mers in 𝐻, as it is distinct from all of them. Hence, we
+mark 𝐸(Tr𝑛
+) as a reference and create a tuple for 𝐸
+𝑛
+0
+as well as all the
+subsequent 𝑘-mers 𝐸
+𝑛
+𝑖
+(𝑖 > 0), in order to prepare for referentially
+representing other sequences.
+2) If 𝐻 [key] ≠ ∅ and a tuple (𝐸
+𝑛
+′
+𝑖
+′
+, 𝑛′
+, off𝑖
+′, pt𝑖
+′, pd𝑖
+′) exists with
+𝐸
+𝑛
+′
+𝑖
+′ = 𝐸
+𝑛
+0
+, Tr𝑛
+is marked as a non-reference. Then, we initialize
+a factor 𝐸(Ma0) = (𝑛
+′
+, off𝑖
+′, 𝑘, ∅) for 𝐸(Tr𝑛
+), where 𝑘 is the current matched length and ∅ indicates that the mis-matched value
+of 𝐸(Ma0) is unknown. Next, we follow an existing work [25] to
+greedily match the subsequent character 𝐸
+𝑛
+𝑖+1
+[𝑘 − 1] (𝑖 > 0) with
+that in 𝐸(Tr𝑛
+′
+). This process ends when a mis-matched character
+𝑀 occurs. So far, a factor (𝑛
+′
+, 𝑆, 𝐿, 𝑀) is generated, where 𝐿 is the
+final matched length of the subsequence of 𝐸(Tr𝑛
+′
+) and 𝑆 = off𝑖
+′.
+Then we wait until another 𝑘-mer forms and repeat the process.
+Clearly, the time delay occurs mainly when waiting for 𝑘 mapped
+GPS points before initializing a factor.
+Example 3. Following the example shown in Figure 4 and Table 2,
+since 𝐸
+3
+0 matches with 𝐸
+1
+0
+, we initialize a factor (1, 0, 3, ∅) for it. For the
+arriving 𝐸(Tr3
+3
+) = ⟨1⟩, we retrieve 𝐸(Tr1
+) [3] according to the index
+pd0
+associated with 𝐸
+1
+0
+, i.e, 954, and compare it with 𝐸(Tr3
+3
+) (= 𝐸
+3
+1
+[2]).
+After that, we update the factor to (1, 0, 4, ∅) due to 𝐸(Tr1
+) [3] =
+𝐸(Tr3
+3
+). As 𝐸(Tr1
+) [4] ≠ 𝐸
+3
+2
+[2], we generate a factor, i.e., (1, 0, 4, 1),
+for Com𝐸 (Tr3
+). Then, we wait until 𝐸(Tr3
+6
+) arrives due to |𝐸(Tr3
+5
+) ∪
+𝐸(Tr3
+6
+)| ≥ 3 and repeat the process. Finally, we get Com𝐸 (Tr3
+) =
+⟨(1, 0, 4, 1), (2, 5, 5, 3)⟩.
+However, a streaming trajectory Tr𝑛
+can be a non-reference
+at the beginning but cannot be referentially represented since a
+timestamp 𝑡𝑖
+, because its 𝑘-mer formed at 𝑡𝑖 cannot match any
+tuple stored in the hash table 𝐻. In this case, we call Tr𝑛
+as a hyreference and create a tuple for each 𝑘-mer of Tr𝑛 generated since
+𝑡𝑖 to referentially represent other sequences. Intuitively, the former
+part of a hy-reference Tr𝑛
+is a non-reference that is referentially
+represented, while the latter part of it is a reference.
+We store a repetitive 𝐸
+𝑛
+𝑖
+as (𝑛, off𝑖
+, 𝑝𝑡𝑖
+, 𝑝𝑑𝑖) by omitting the redundant 𝐸
+𝑛
+𝑖
+. We associate this tuple with (𝐸
+𝑛
+′
+𝑖
+′
+, 𝑛′
+, off𝑖
+′, 𝑝𝑡𝑖
+′, 𝑝𝑑𝑖
+′)
+(𝐸
+𝑛
+′
+𝑖
+′ = 𝐸
+𝑛
+𝑖
+) (i.e., they are stored in the same hash entry) to trace
+back the subsequence of Tr𝑛 during 𝑘-mer matching. As shown
+in Figure 4, the tuple of 𝐸
+1
+4
+, i.e., (1, 4, 86, null) is associated with
+that of 𝐸
+2
+1
+, as 𝐸
+1
+4
+= 𝐸
+2
+1
+. Here, null indicates that 𝐸
+1
+5
+is unknown at
+the current timestamp. Moreover, 𝐸
+𝑛
+𝑖
+and 𝐸
+𝑛
+′
+𝑖
+′ may be stored in the
+same hash entry even if 𝐸
+𝑛
+𝑖
+≠ 𝐸
+𝑛
+′
+𝑖
+′ due to hash collisions. According the introduction of 𝑘-mer matching in Section 2.3, 𝑘 remains
+1179
+unchanged during compression and only determines the length of
+the initial matched subsequence. However, 𝑘 cannot be too large
+or too small. A too large 𝑘 may result in a very high probability of
+failed matching and thus excessively many references, and a too
+small 𝑘 may lead to many “trivial” matches, where each factor of a
+non-reference represents a very short subsequence. We study the
+impact of 𝑘 on compression performance in Section 7.
+4.4 Reference Deletion for E(Tr𝑛
+)
+The number of 𝑘-mers stored in the hash table increases over time.
+To reduce the storage cost, we delete the 𝑘-mers corresponding to
+references from the hash table that have not been visited for a long
+time. A reference 𝐸(Ref) is visited if i) it referentially represents a
+non-reference or ii) its corresponding data is still arriving. We define
+𝐺𝑜 as the set of the references at timestamp t𝑜 . Specifically, 𝐺𝑜 [𝑖],
+that represents a reference 𝐸(Ref), denotes the tuple (ref𝑖𝑑,𝐺𝑜 [𝑖].tl),
+where ref𝑖𝑑 is the ID of the reference 𝐺𝑜 [𝑖], and 𝐺𝑜 [𝑖].tl is the
+timestamp when 𝐺𝑜 [𝑖] was most recently visited.
+Definition 8. A reference 𝐺𝑜 [𝑖] is outdated at t𝑜 if its freshness at t𝑜 , denoted as 𝐺𝑜 [𝑖].𝑓 , satisfies 𝐺𝑜 [𝑖].𝑓 < 𝐶 ·
+𝐹𝑜
+|𝐺𝑜 |
+, where
+𝐹𝑜 =
+Í|𝐺𝑜 |−1
+𝑖
+′=0
+𝐺𝑜 [𝑖
+′
+].𝑓 and 𝐶 (0 < 𝐶 ≤ 1) is the deletion coefficient.
+We set the deletion coefficient 𝐶 ∈ (0, 1] because we consider
+a reference as outdated only if its freshness is below the average
+freshness 𝐹𝑜
+|𝐺𝑜 |
+. A larger𝐶 implies that references expire more easily.
+We calculate 𝐺𝑜 [𝑖].𝑓 as follows:
+𝐺𝑜 [𝑖].𝑓 = 𝜆
+t𝑜−𝐺𝑜 [𝑖].tl (t𝑜 ≥ 𝐺𝑜 [𝑖].tl), (1)
+where 𝜆 ∈ (0, 1) is a decay factor [7]. In Figure 2, given the current
+timestamp t𝑜 =7:03:26 and 𝜆 = 0.998, we get 𝐸(Tr1
+).𝑓 = 0.998 at t𝑜 .
+Definition 8 is more effective than using a fixed threshold to
+determine whether a reference is expired. Specifically, using a fixed
+threshold, if no trajectory arrives for a long time due to an occasional interrupt of communications, all references in the hash
+table will expire. A naive solution is to update the freshness of
+each reference in the hash table at each timestamp in order to
+compute the average freshness and then to identify the outdated
+data. To improve efficiency, we propose to compute the freshness
+of parts of 𝐺𝑜 [𝑖] (0 ≤ 𝑖 < |𝐺𝑜 |) at t𝑜 . We sort 𝐺𝑜 in ascend order
+of 𝐺𝑜 [𝑖].𝑓 (0 ≤ 𝑖 < |𝐺𝑜 |). Then, we detect expired data in order
+until𝐺𝑜 [𝑖
+′
+].𝑓 ≥ 𝐶 ·
+𝐹𝑜
+|𝐺𝑜 |
+(0 < 𝑖
+′ < |𝐺𝑜 |). Specifically, no 𝑘-mers are
+deleted if 𝐺𝑜 [0].𝑓 ≥ 𝐶 ·
+𝐹𝑜
+|𝐺𝑜 |
+. This process can actually be realized
+without sorting, as shown in Algorithm 1. Next, we define a set
+containing the references in 𝐺𝑜 that are visited at t𝑜 , denoted as
+𝑅𝑣𝑜 (𝑅𝑣𝑜 ⊆ 𝐺𝑜 ). Given 𝐹𝑜
+′, 𝐹𝑜 (𝑡𝑜 > 𝑡𝑜
+′) is updated as follows:
+𝐹𝑜 = (𝐹𝑜
+′ −
+Õ
+𝐺𝑜
+′ [𝑖] ∈𝑅𝑣𝑜
+𝐺𝑜
+′ [𝑖].𝑓 ) · 𝜆
+t𝑜−t𝑜
+′ + |𝑅𝑣𝑜 | (2)
+Formula 2 enables us to update 𝐹𝑜 by only computing the freshness
+of 𝐺𝑜
+′ [𝑖], such that 𝐺𝑜
+′ [𝑖] ∈ 𝑅𝑣𝑜 . The derivation of it is omitted
+due to the space limitation.
+Algorithm 1 details the reference deletion. Assuming that the latest timestamp when new data arrives is 𝑡𝑜
+′. The algorithm searches
+each 𝐺𝑜
+′ [𝑖] ∈ Rv𝑜 in the current reference set 𝐺𝑜
+′ and removes
+𝐺𝑜
+′ [𝑖] from 𝐺𝑜
+′ if it exists in Rv𝑜 (Lines 1–4). Then, each reference
+𝐸(Ref) ∈ Rv𝑜 is appended to 𝐺𝑜
+′ (Line 6). This way, it sorts 𝐺𝑜
+′ in
+ascending order of freshness. Meanwhile, Formula 2 is applied to
+Algorithm 1: Reference Deletion Algorithm
+Input: the reference set 𝐺𝑜
+′ at t𝑜
+′, the set 𝑅𝑣𝑜 , the sum of
+freshness 𝐹𝑜
+′ and a threshold 𝐶
+Output: the reference set 𝐺𝑜 and the sum of freshness 𝐹𝑜
+1 for each reference 𝐸(Ref) ∈ 𝑅𝑣𝑜 do
+2 if 𝐸(Ref) ∈ 𝐺𝑜
+′ with 𝐸(Ref)=𝐺𝑜
+′ [𝑖] then
+3 compute 𝐺𝑜
+′ [𝑖].𝑓 using Formula 1
+4 remove the tuple (ref𝑖𝑑, 𝐺𝑜
+′ [𝑖].tl) from 𝐺𝑜
+′
+5 𝐹𝑜
+′ ← 𝐹𝑜
+′ − 𝐺𝑜
+′ [𝑖].𝑓
+6 append the tuple (ref𝑖𝑑, 𝑡𝑜 ) to 𝐺𝑜
+′
+7 𝐹𝑜 ← 𝐹𝑜
+′ · 𝜆
+t𝑜−t𝑜
+′ + |𝑅𝑣𝑜 |
+8 while 𝜆
+t𝑜−𝐺𝑜
+′ [0].tl < 𝐶 ·
+𝐹𝑜
+|𝐺𝑜
+′ |
+do
+9 𝐹𝑜 ← 𝐹𝑜 − 𝜆
+t𝑜−𝐺𝑜
+′ [0].tl
+10 remove the tuple (ref𝑖𝑑, 𝐺𝑜
+′ [0].tl) from 𝐺𝑜
+′
+11 delete the 𝑘-mers associated with 𝐺𝑜
+′ [0] from the hash table
+12 return 𝐺𝑜
+′ (= 𝐺𝑜 ) and 𝐹𝑜
+calculate 𝐹𝑜 (Lines 5 and 7) and 𝐺𝑜
+′ is updated to 𝐺𝑜 . After “sorting”, we check the freshness of references in 𝐺𝑜 by starting from
+its first reference every time, in order to only calculate the freshness of the potentially outdated references (Lines 8–11). Finally,
+the updated references 𝐺𝑜 and the sum of their freshness 𝐹𝑜 are
+returned (Line 12). This approach reduces the time complexity of
+updating freshness from 𝑂(|𝐺𝑜 |) to 𝑂(|Rv𝑜 | + |EX𝑜 |), where EX𝑜
+is the set of expired references at 𝑡𝑜 . We evaluate the effectiveness
+and efficiency of reference deletion via experiments in Section 7.
+4.5 Reference Rewriting for E(Tr𝑛
+)
+To further improve the compression ratio, we rewrite the references
+𝐸(Ref) in real-time. The motivation is that a non-frequent edge
+sequence may become a reference if it arrives early. For example,
+given a frequent path ⟨44183, 2, 2, 1, 1, 1, 2, 2⟩, ⟨2, 2, 1, 1, 1, 2, 2⟩, i.e., a
+subsequence of 𝐸(Tr3
+), should be stored as 𝑘-mers. However, since
+Tr1
+arrives before Tr3
+and 𝐸(Tr1
+) can referentially represent 𝐸(Tr3
+),
+𝐸(Tr3
+) is made as a non-reference and Tr1
+is a reference, as shown
+in Example 3. In this case, for another new arriving subsequent Tr𝑛
+that also traverses ⟨44183, 2, 2, 1, 1, 1, 2, 2⟩, Com𝐸 (Tr𝑛
+) will contain
+at least two factors. To address the problem, we detect the frequent
+subsequence and rewrite the 𝑘-mers in real-time. Following an
+existing study [39], we define the rewriting candidate below.
+Definition 9. A rewriting candidate is a reference 𝐸(Ref) that
+represents a non-reference 𝐸(Nref) as Com𝐸 (Nref) = ⟨· · · , (refid, 𝑆, 𝐿,
+𝑀), (refid, 𝑆′
+, 𝐿′
+, 𝑀′
+), · · · ⟩, where 𝑆 + 𝐿 + 1 = 𝑆
+′ and refid is the ID of
+the reference Ref.
+Given a rewriting candidate Ref, we can merge two factors
+(refid, 𝑆, 𝐿, 𝑀) and (refid, 𝑆′
+, 𝐿′
+, 𝑀′
+) into one factor (refid, 𝑆, 𝐿 + 1 +
+𝐿
+′
+, 𝑀′
+), by replacing 𝐸(𝑅𝑒 𝑓 ) [𝑆 +𝐿] with 𝑀, which is called a rewriting operation.
+Example 4. Given 𝐸(Tr4
+) = ⟨2, 2, 1, 1, 4, 1, 3, 1, 2, 3, 3⟩ such that
+Tr4 arrives after Tr1
+ends, 𝐸(Tr1
+) becomes a rewriting candidate as
+Com𝐸 (Tr4
+) = ⟨(1, 0, 6, 3), (1, 7, 3, 3)⟩. If 𝐸(Tr1
+) [6] is replaced with 3,
+Com𝐸 (Tr4
+) will only contain one factor, i.e., (1, 0, 10, 3), which leads to
+a higher compression. Similarly, given 𝐸(Tr5
+) = ⟨1, 1, 4, 1, 3, 1, 2, 3, 3⟩
+such that Tr5 also arrives after Tr1
+terminates, the compression can
+be improved by replacing 𝐸(Tr1
+) [6] with 3.
+1180
+Algorithm 2: Reference Rewriting Algorithm
+Input: a rewriting operation, i.e., replacing 𝐸(Ref) [𝑖] with 𝑀, a
+𝑏 × 𝑏 factor matrix FA of 𝐸(Ref), an array rp of 𝐸(Ref) and
+a threshold 𝛼
+Output: a rewritten reference or ∅
+1 𝑓 (𝑀) ← 𝑓 (𝑀) + 1, where 𝑓 (𝑀) is associated with rp[𝑖]
+2 if ∀𝑀′ ∈ 𝑟𝑝 [𝑖] (𝑓 (𝑀) ≥ 𝑓 (𝑀′
+)) ∧ 𝑓 (𝑀) ≥ 𝛼 then
+3 if Í⌊
+𝑖
+𝑘
+⌋+1
+𝑥=1
+Í𝑏
+𝑦=⌊
+𝑖
+𝑘
+⌋+1
+FA𝑥 𝑦 < 𝑓 (𝑀) then
+4 replace 𝐸(Ref) [𝑖] with 𝑀
+5 update 𝑘-mers associated with 𝐸(Ref)
+6 delete FA and rp of 𝐸(Ref)
+7 return a rewritten reference
+8 else
+9 return ∅ /* no operation will be conducted */
+10 else
+11 return ∅ /* no operation will be conducted */
+We construct an array rp for each 𝐸(Ref), where rp[𝑖] is a list
+recording 𝑀 corresponding to a rewriting operation for 𝐸(Ref) [𝑖] (1
+≤ 𝑖 < |𝐸(Ref) − 1|) and its frequency of occurrence, denoted as
+𝑓 (𝑀). Following Example 4, rp[6] of 𝐸(Tr1
+) is ⟨(3, 2)⟩, due to 𝑀 = 3
+and 𝑓 (𝑀) = 2. Obviously, a prerequisite for conducting a rewriting
+operation is that 𝑓 (𝑀) should be large. This is to guarantee that
+a frequent subsequence (i.e., a frequent path) is generated by the
+rewriting. Moreover, we should ensure that the factors overlapping
+𝐸(Ref) [𝑖] occur rarely. Given a factor (refid, 𝑆, 𝐿, 𝑀), it intersects
+𝐸(Ref) [𝑖], if refid is the ID of Ref and 𝑆 ≤ 𝑖 < 𝑆 + 𝐿.
+Example 5. Given 𝐸(Tr6
+) = ⟨2, 2, 1, 1, 4, 1, 2, 1, 2, 2, 2, 2, 1, 3⟩ such
+that Tr6 arrives after Tr1
+terminates, we get Com𝐸 (Tr6
+) = ⟨(1, 0, 9, 2),
+(1, 0, 3, 3)⟩, where (1, 0, 9, 2) intersects 𝐸(Tr1
+) [6]. Following Example 4, even if replacing 𝐸(Tr1
+) [6] with 3 reduces the number of factors
+of both Com𝐸 (Tr4
+) and Com𝐸 (Tr5
+), it produces one more factor for
+Com𝐸 (Tr6
+). This indicates that we should rewrite 𝐸(Tr1
+) [6] only
+when it does not frequently intersect any factors.
+The above analysis implies that we should record each factor that
+intersects 𝐸(Ref) [𝑖] (1 ≤ 𝑖 < |𝐸(Ref)| − 1) for rewriting. Intuitively,
+this results in a high space-time consumption. Inspired by the regular square grid graph [10], we construct a 𝑏 ×𝑏 factor matrix FA for
+each 𝐸(Ref), where 𝑏 = ⌈
+|𝐸(Ref) |𝑟
+𝑘
+⌉. Here, |𝐸(Ref)|𝑟 is the length of
+the subsequence of 𝐸(Ref) used as a reference. FA[𝑥] [𝑦] (𝑥, 𝑦 > 0),
+denoted as FA𝑥 𝑦, is associated with a subsequence of 𝐸(Ref) in its
+factor matrix, i.e., ⟨𝐸(Ref) [(𝑥 − 1) · 𝑘], · · · , 𝐸(Ref) [𝑦 · 𝑘 − 1]⟩, and
+counts the frequency of factors (refid, 𝑆, 𝐿, 𝑀) intersecting 𝐸(Ref) [𝑖]
+( (𝑥 − 1) · 𝑘 ≤ 𝑖 ≤ 𝑦 · 𝑘 − 1), where refid is the ID of Ref. Thus, we
+update FA once a factor is generated.
+Proposition 4.1. A factor (ref𝑖𝑑, 𝑆, 𝐿, 𝑀) contributes to FA𝑥 𝑦
+,
+where 𝑥 = ⌊
+𝑆
+𝑘
+⌋ + 1 and 𝑦 = ⌈
+𝑆+𝐿
+𝑘
+⌉.
+Example 6. Following Examples 3, 4, and 5 and assuming that
+Tr = {Tr1
+, Tr2
+, Tr3
+, Tr4
+, Tr5
+, Tr6
+}, the factor matrix FA of 𝐸(Tr1
+) is:
+FA =
+
+
+
+
+
+
+
+
+[0, 2] [0, 5] [0, 8] [0, 11]
+[3, 5] [3, 8] [3, 11]
+[6, 8] [6, 11]
+[9, 11]
+
+
+
+
+
+
+
+
+→
+
+
+
+
+
+
+
+
+1 3 1 0
+0 0 0
+0 2
+0
+
+
+
+
+
+
+
+
+Here, the left part of FA intuitively gives the subsequences of 𝐸(Tr1
+)
+corresponding to FA𝑥 𝑦, and the right part shows the value of FA𝑥 𝑦
+.
+For instance, FA12 = 3 is contributed by three factors, i.e, (1, 0, 4, 1),
+(1, 0, 6, 3), and (1, 2, 4, 3).
+Lemma 1. Given a factor (refid, 𝑆, 𝐿, 𝑀) that intersects 𝐸(Ref) [𝑖]
+and a 𝑏 × 𝑏 factor matrix FA of 𝐸(Ref), (refid, 𝑆, 𝐿, 𝑀) can only contribute to FA𝑥 𝑦, where 𝑥 ≤
+𝑖
+𝑘
++ 1 ∧𝑦 >
+𝑖
+𝑘
+.
+Proof. As (refid, 𝑆, 𝐿, 𝑀) intersects 𝐸(Ref) [𝑖], we have 𝑆 ≤ 𝑖 <
+𝑆 + 𝐿. Proposition 4.1 guarantees that 𝑆 ≥ (𝑥 − 1) · 𝑘 ∧𝑆 + 𝐿 ≤ 𝑦 · 𝑘
+if (refid, 𝑆, 𝐿, 𝑀) contributes to FA𝑥 𝑦. Hence, we have 𝑖 ≥ (𝑥 − 1) ·
+𝑘 ∧ 𝑖 < 𝑦 · 𝑘, i.e., 𝑥 ≤
+𝑖
+𝑘
++ 1 ∧𝑦 >
+𝑖
+𝑘
+. □
+Lemma 2. Given a 𝑏 ×𝑏 factor matrix FA of 𝐸(Ref), the maximum
+number of factors that intersect 𝐸(Ref) [𝑖] is Í⌊
+𝑖
+𝑘
+⌋+1
+𝑥=1
+Í𝑏
+𝑦=⌊
+𝑖
+𝑘
+⌋+1
+FA𝑥 𝑦
+.
+Proof. Following Lemma 1, the factors intersecting 𝐸(Ref) [𝑖]
+can only contribute to FA𝑥 𝑦, where 𝑥 ≤
+𝑖
+𝑘
++ 1 ∧ 𝑦 >
+𝑖
+𝑘
+. As a
+result, the maximum number of the factors that intersect 𝐸(Ref) [𝑖]
+is Í⌊
+𝑖
+𝑘
+⌋+1
+𝑥=1
+Í𝑏
+𝑦=⌊
+𝑖
+𝑘
+⌋+1
+FA𝑥 𝑦
+. □
+Example 7. Continuing Example 6, the maximum number of the
+factors intersecting 𝐸(Tr) [6] is Í3
+𝑥=1
+Í4
+𝑦=3
+FA𝑥 𝑦 = 3, where only 6
+out of 10 elements in FA need to be visited.
+Based on the above conclusions, we present the conditions for
+implementing a rewriting operation, i.e, replacing 𝐸(Ref) [𝑖] with
+𝑀: i) 𝑓 (𝑀) ≥ 𝛼, where ∀𝑀′ ∈ 𝑟𝑝 [𝑖] (𝑓 (𝑀) ≥ 𝑓 (𝑀′
+)) and 𝛼 (≥
+1) is the rewriting coefficient, and ii) Í⌊
+𝑖
+𝑘
+⌋+1
+𝑥=1
+Í𝑏
+𝑦=⌊
+𝑖
+𝑘
+⌋+1
+FA𝑥 𝑦 <
+𝑓 (𝑀). The first condition ensures that 𝑀 occurs more frequently
+than other characters for a given position 𝑖. The second condition
+ensures that the maximum number of factors intersecting 𝐸(Ref) [𝑖]
+is smaller than 𝑓 (𝑀). Note that a smaller 𝛼 means that 𝑓 (𝑀) ≥ 𝛼
+occurs more often, thus implying more frequent rewriting.
+Algorithm 2 presents the pseudo-code of rewriting references. If
+a reference is rewritten, we update its corresponding 𝑘-mers (Line
+5). Moreover, we store the rewritten reference by referentially representing it according to the corresponding original one. The aim
+is to reduce the storage needed when introducing a new reference.
+Thus, we do not consider to rewrite a reference more than once, as
+it introduces 𝜃-order compression (𝜃 > 2) at the cost of decreased
+efficiency of decompression and querying. This is also the reason
+that we delete FA and rp after rewriting a reference (Line 6). In addition, we observe that the factor matrix FA of 𝐸(Ref) still takes up
+unnecessary space due to FA𝑥 𝑦 (𝑦 > 𝑥) = ∅. Hence, to store FA𝑥 𝑦
+,
+we construct a vector FV of size 𝑏 · (𝑏+1)
+2
+, where 𝑏 = ⌈
+|𝐸(Ref) |𝑟
+𝑘
+⌉ and
+|𝐸(Ref)|𝑟 is the length of 𝐸(Ref) that is used as a reference. FV is
+enlarged over time according to the latest |𝐸(Ref)|𝑟. The worst case
+time complexity of reference rewriting for a reference is 𝑂(|FV|).
+However, Lemma 2 enables rewriting by scanning part of FV (as
+shown in Example 7), which enhances the efficiency of reference
+rewriting. This is also studied in Section 7.
+4.6 Reference Selection and Deletion for V(Tr𝑛
+)
+The reference selection for V(Tr𝑛
+) is almost the same as that for
+E(Tr𝑛
+). However, as a speed V(Tr𝑛
+) [𝑖] is a float, we cannot directly
+apply 𝑘-mer matching to it. Instead, we convert it to an integer
+V¥(Tr𝑛
+) [𝑖], where V¥(Tr𝑛
+) [𝑖] is the integer closest to V(Tr𝑛) [𝑖]
+0.5
+𝜂 . This
+1181
+strategy is consistent with the error-bounded referential representation in Section 4.2. The reference deletion for V(Tr𝑛
+) is also similar
+to that for E(Tr𝑛
+); thus, we omit it. Moreover, we do not rewrite a
+reference V(Ref), as speed patterns may vary substantially during
+different time periods [12, 24] and the latest patterns have already
+been mined by reference selection.
+5 COMPRESSION
+We proceed to present the binary encoding and data transmission
+of streaming trajectories.
+5.1 Binary Encoding
+We denote the binary code of seq as seqˆ . e.g., the binary code of
+𝐸(·) is denoted as 𝐸ˆ(·).
+Binary Encoding of References. We follow UTCQ [19] to
+compress 𝐸(Ref). Moreover, we adapt a typical scheme [41] to encode RD(Ref) and GD(Ref). Specifically, given an encoding error
+bound 𝛾, the binary code ˆ
+fv of a floating number fv is calculated
+as ˆ
+fv = arg min
+ˆ
+fv𝑚
+
+
+
+
+Í|
+ˆ
+fv𝑚 |
+𝑖=1
+ˆ
+fv𝑚 [𝑖 − 1] · 1
+2
+𝑖 − fv
+
+
+
+
+, where |
+ˆ
+fv𝑚 | = 𝛾. For
+example, given fv = 0.37 and 𝛾 = 3, we get ˆ
+fv=011, i.e., fv is approximated as 0.375. The binary code of a reference 𝜙 (Ref) (𝜙 = 𝐸, GD) is
+delivered to the centralized cloud immediately after it is generated.
+Binary Encoding of Non-references. We set the lengths of
+the binary codes of both 𝑆 and 𝐿 the same, denoted aslen, and record
+it for decoding a factor (refid, 𝑆, 𝐿, 𝑀) in a streaming setting. The
+Exp-Golomb encoding [37] is adopted to compress len. Moreover,
+len is set to 0 if the reference 𝜙 (Ref) has terminated before generating a factor (refid, 𝑆, 𝐿, 𝑀). This way, we can improve compression
+as len = 0 only takes 1 bit, and both ˆ𝑆 and 𝐿ˆ are still decodable as
+the length of 𝜙 (Ref) is known [19]. Finally, 𝑀ˆ takes ⌈log2
+𝑜⌉ bits
+for Com𝐸 (Nref) and takes 𝛾 bits for Com𝑉 (Nref), where 𝑜 is the
+maximum number of outgoing edges for any vertex 𝑣 ∈ 𝑉 .
+5.2 Transmission of Compressed Binary Codes
+As illustrated in Section 4.3, a factor (refid, 𝑆, 𝐿, 𝑀) cannot be generated until the mis-matched character 𝑀 is found. It is easy to
+recognize each part of a factor if we transmit it as a whole to the
+centralized cloud. However, in this case, the centralized query processor is unable to receive the latest data in real-time, resulting
+in inaccurate results. To avoid this, we continue transmitting the
+up-to-date information of a factor during its formation.
+We propose a data transmission strategy, which targets low
+transmission overhead and enables decoding at the centralized
+cloud without the need of delivering extra information. Given the
+value of 𝑘 for 𝑘-mer, the transmission of a factor (refid, 𝑆, 𝐿, 𝑀)
+is completed in three states: ① transferring the initialized factor
+(refid, 𝑆, 𝐿′
+, ∅), where 𝐿
+′ ≥ 𝑘 and |
+ˆ𝑆 | = |𝐿ˆ′
+|; ② transferring the
+updated 𝐿
+′
+; and ③ transferring the mis-matched element 𝑀 when
+𝐿
+′
+is updated to 𝐿. We denote the binary code of a factor transmitted
+to the centralized cloud at each timestamp as ˆbc. Obviously, |
+ˆbc| =
+|
+ˆ refid| + 2 · | ˆ𝑆 | ≥ | ˆ refid| + 2 · 𝑘 at step ①, and the ˆbc that is used to
+update 𝐿
+′
+at step ② is always |
+ˆ refid| + 1. As the maximum number
+of outgoing edges for any vertices in a road network is generally no
+less than 4, i.e, 𝑜 ≥ 4, and we set 𝛾 ≥ 2, we have |
+ˆbc| = |
+ˆ refid|+ |𝑀ˆ | >
+|
+ˆ refid|+1 at step ③. If we let 2·| ˆ𝑆 | ≠ |𝑀ˆ |, the binary codes transferred v2
+v3
+v5 v4
+v6
+v7 v10
+v11
+v12
+l1
+l2
+l4
+l3
+l5
+v0 l0 l0
+l2
+l3
+l4
+l5
+l6
+l8
+2 2
+1
+1
+4
+2 1
+2
+2
+3
+3
+2 2 1
+1
+1
+2 2 2
+3
+3
+3
+(a) (b) 1 Tr 3 Tr
+l9
+1
+re0 re1
+r0
+z0
+r1 z1
+RE0
+RE1
+v1 l1
+000 001 010
+011 100
+101 110 111
+v8 v9
+l6
+8
+r0
+r2 z1
+RE1
+l7
+Figure 5: The partition of the road network 𝐺 in Figure 2.
+during the above three states can be distinguished just by |
+ˆbc|. The
+initial state is ③.
+Example 8. Continuing Example 5 and letting ˆ refid take 3 bits,
+the first factor of Com𝐸 (Tr6
+) is initialized as (1, 0, 3, ∅) and thus is
+encoded as (000, 00, 10), i.e., ˆbc = 0000010. Then it is sent to the
+centralized cloud, which triggers the state transition from ③ to ①.
+Next, we continue to transfer ˆbc = 0001 before the mis-matched value
+𝑀 = 2 is found, during which the state is first transferred to ② and
+then remains unchanged. Meanwhile, 𝐿
+′
+continues to be incremented
+by 1. Once the centralized cloud receives 𝑀 = 2, i.e., ˆbc = 000001,
+a factor is generated and stored in the form (𝑀, ˆ ˆ
+𝑙𝑒𝑛, ˆ refid,
+ˆ𝑆, 𝐿ˆ), i.e.,
+(001, 0, 000, 0000, 1000), in the centralized cloud, where we assume
+𝑜 = 7, i.e., 𝑀ˆ takes 3 bits.
+6 QUERY PROCESSING
+6.1 Query Definition
+Definition 10. Given a query region RE and a set of compressed
+streaming trajectories Trˆ , a range query range(Trˆ , RE) returns the
+set of streaming trajectories Tr𝑛
+(1 ≤ 𝑛 ≤ 𝑁) in Tr, such that Tr𝑛 ∩
+RE ≠ ∅ at the current timestamp.
+We denote the lastest timestamp of a trajectory Tr𝑛
+as Tr𝑛
+.tp,
+i.e., Tr𝑛
+.tp = 𝑡(Tr𝑛
+) [|𝑡(Tr𝑛
+)| − 1].
+Example 9. Considering the streaming trajectories in Figure 2 and
+assuming that the current timestamp is 7:04:06, we have Tr1
+.tp =7:04:06
+and Tr3
+.tp =7:03:55. Given 𝑘 = 2, 𝛾 = 7, 𝜂 = 0, and | (𝑣0 → 𝑣1)| =
+| (𝑣1 → 𝑣2)| = | (𝑣2 → 𝑣3)| = 100, we get ad(Tr1
+) [2] = 254.76,
+ad(Tr3
+) [1] = 127.38, and 𝑉 (Tr3
+) [1] = 5.12 after decompression, i.e.,
+Tr1
+is located on (𝑣2 → 𝑣3) and Tr3
+is located on (𝑣1 → 𝑣2); thus,
+the range query range(Trˆ , RE1) returns ∅.
+A naive strategy for computing range queries over compressed
+streaming trajectories is to decompress each Tr𝑛
+(1 ≤ 𝑛 ≤ 𝑁) and
+calculate their current locations, which is time-consuming. Instead
+we introduce indexing and filtering to achieve fast query processing.
+6.2 Index and Filtering Technique
+We partition the road network𝐺 using grid cells𝑟𝑒𝑚, each of which
+links to the streaming trajectories that are currently located in it.
+The number of grid cells is denoted by gc. Figure 5 partitions the
+road network 𝐺 in Figure 2. Considering the examples in Figure 2
+and assuming the current timestamp is 7:03:25, 𝑟𝑒0 links to Tr1
+.
+Definition 11. The minimum distance mind(re𝑚, RE) between
+a grid cell re𝑚 and a query region RE is the distance between a location
+𝑟 and a location 𝑧, denoted as |𝑟𝑧|, where 𝑟 ∈ re𝑚 ∧ 𝑧 ∈ RE ∧ ∀𝑟
+′ ≠
+𝑟 (𝑟
+′ ∈ re𝑚 ∧ |𝑟
+′
+𝑧| ≥ |𝑟𝑧|) ∧ ∀𝑧
+′ ≠ 𝑧 (𝑧
+′ ∈ RE ∧ |𝑟𝑧′
+| ≥ |𝑟𝑧|).
+1182
+For instance in Figure 5a, the minimum distance between grid
+cell re1 and query region RE0 is |𝑟0𝑧0 |. Since queries are computed
+centrally, we need to calculate the current location of each streaming trajectory from the most recently arrived data. Given a speed
+constraint 𝜇 of the road network and a timestamp tc, the reachable
+distance of a streaming trajectory Tr𝑛 w.r.t. tc, denoted as dis, is
+(tc−Tr𝑛
+.tp)·𝜇. Following Example 9 and given 𝜇 = 21, the reachable
+distance of Tr1 w.r.t. 7:04:06 is 0 × 21 = 0, while that of Tr3 w.r.t.
+7:04:06 is 11 × 21 = 231.
+Lemma 3. Given a range query range(Trˆ , RE), the current timestamp tc, the reachable distance dis of Tr𝑛 w.r.t. tc, and Tr𝑛
+located in
+grid cell𝑟𝑒𝑚 at Tr𝑛
+.tp, if the minimum distance mind(re𝑚, RE) > dis,
+Tr𝑛
+cannot be in the result.
+Proof. Assuming that Tr𝑛 has a mapped location 𝑙 at Tr𝑛
+.tp,
+we have 𝑙 ∈ re𝑚 as Tr𝑛
+located in grid cell 𝑟𝑒𝑚 at Tr𝑛
+.tp. Since
+mind(re𝑚, RE) > dis, the distance between 𝑙 and RE must also
+exceed the reachable distance dis of Tr𝑛 w.r.t. tc, i.e., Tr𝑛
+cannot
+reach RE at tc. Hence, Tr𝑛
+cannot be in the query result. □
+Lemma 3 enables pruning Tr𝑛 without computing its location
+at the current timestamp. Following Example 9 and given |𝑟2𝑧1 | =
+233 in Figure 5b, we do not need to decompress Comˆ
+𝐸 (Tr3
+) and
+Comˆ
+𝑉 (Tr3
+) if a range query range(Trˆ , RE1) arrives at 7:04:06. This
+is because Tr3 overlaps re0 at 7:03:55 and the reachable distance of
+Tr3 w.r.t. 7:04:06 is 231<233. If Tr𝑛
+cannot be filtered, we need to
+fully decompress it to calculate its current location. The details are
+omitted due to the space limitation.
+6.3 Index Transmission
+Index information is created at the edge server once new data arrives, while query processing occurs centrally. Hence, we need to
+deliver the index to the centralized cloud. As illustrated in Section 5.2, we always transmit a compressed trajectory once it is
+(referentially) represented, in order to support accurate queries. A
+naive strategy is to transfer the ID of the grid cell where Tr𝑛
+is
+located at each timestamp, which incurs high transmission cost.
+We propose to transfer the ID of the grid cell, denoted as 𝑔id, for
+Tr𝑛 only when it changes. As shown in Figure 5b, Tr𝑛
+can enter at
+most 8 grid cells if it leaves the current grid cell. Therefore, 𝑔ˆid takes
+3 bits and is appended to ˆbc. We add one bit at the beginning of ˆbc
+to identify whether it carries index information. The transmission
+algorithm that includes indexes is very similar to that in Section 5.2,
+so we omit the details due to the space limitation.
+6.4 Discussion
+TRACE is able to adopt and support a variety of partitioning methods and queries, as discussed next.
+Road Network Partition. We introduce two representative
+partitioning methods, spatial partitioning [22, 30] and graph-based
+partitioning [1, 35, 36], which are alternatives to our grid partitioning. Quad-tree partitioning [22, 30] is used often in different
+settings. It recursively decomposes the space while considering the
+spatial distribution of the underlying data, and it stops when some
+pre-defined conditions are satisfied. Each tree node represents a
+subregion and has either exactly four children (an internal node),
+or no children (a leaf node). In congestion-based partitioning of a
+road network [1, 35, 36], edges are associated with feature values
+Table 3: Trajectory datasets.
+Datasets Storage of NCTs # of NCTs # of edges per NCT
+Denmark 3.47 GB 415,920 Average 95.844
+Hangzhou 24.60 GB 1,918,677 Average 250.540
+Synthetic 384.61 GB 50,000,000 Average 137.712
+Table 4: Parameter ranges and default values.
+Parameter Range
+the length of 𝑘-mer 5, 7, 9, 10, 11, 13, 15, 20, 25
+the value of 𝐶 0.1, 0.3, 0.5, 0.7, 0.9
+the value of 𝛼 2, 3, 4, 5, 6, 8, ∞
+the number of grid cells gc 8
+2
+, 162
+, 322
+, 642
+, 1282
+and traffic densities. Based on this information, different heterogeneous subregions of a road network are identified that exhibit
+homogeneous traffic congestion patterns internally.
+The above-mentioned partitioning methods and corresponding
+indexing techniques can be adapted straightforwardly to TRACE,
+by considering subregions as grid cells. We use grid partitioning
+because it is simple, is very efficient, and has low construction
+cost [24]. However, exploration of possible benefits of other partitioning techniques is a relevant topic for future work.
+Query. We introduce two different types of queries that can be
+supported by TRACE, i.e., a shortest path query and a KNN query.
+We use 𝑙𝑐 to denote the mapped GPS point of a streaming trajectory
+Tr𝑛
+at the current timestamp 𝑡𝑐 .
+Shortest path query: short(Trˆ𝑛, 𝑣𝑞). Given a vertex 𝑣𝑞 and a
+compressed streaming trajectory Trˆ𝑛, short(Trˆ𝑛, 𝑣𝑞) returns the
+shortest path distance between 𝑙𝑐 and 𝑣𝑞. To answer short(Trˆ𝑛, 𝑣𝑞),
+we first decompress 𝑇ˆ(Tr𝑛
+), 𝐸ˆ(Tr𝑛
+) and GDˆ (Tr𝑛
+) (or 𝑉ˆ (Tr𝑛
+)) to
+get 𝑙𝑐 = ( (𝑣𝑖 → 𝑣𝑗), nd(𝑣𝑖
+,𝑙𝑐 ), 𝑡𝑐 )). Then the shortest path distance
+between 𝑙𝑐 and 𝑣𝑞 is obtained by computing the shortest path distances between 𝑣𝑖 and 𝑣𝑞 and between 𝑣𝑗 and 𝑣𝑞 [15]. This process
+can be facilitated by constructing a G*-tree [23].
+KNN query: KNN(Trˆ𝑛, Trˆ , 𝓀). Given a threshold 𝓀, a compressed streaming trajectory Trˆ𝑛, and a set of compressed streaming trajectories Trˆ , KNN(Trˆ𝑛, Trˆ , 𝓀) returns the top 𝓀 streaming
+trajectories in Trˆ ranked by their shortest path distances to 𝑙𝑐 at
+𝑡𝑐 in ascending order. The process of computing KNN(Trˆ𝑛, Trˆ , 𝓀)
+is similar to that of computing short(Trˆ𝑛, 𝑣𝑞). In addition, a priority queue is maintained to perform the most promising vertex
+expansions [23].
+7 EXPERIMENTAL EVALUATION
+7.1 Experimental Setting
+Datasets. We use two real datasets, Denmark (DK) and Hangzhou
+(HZ), and a synthetic dataset, Synthetic (Syn), as described in Table 3.
+DK is collected from 162 vehicles over about 2 years from Jan. 2007
+to Dec. 2008 in Denmark, while HZ is collected from 24,515 taxis
+during Nov. 2011 in Hangzhou, China. Syn is generated using the
+road network of Hangzhou. It contains five data groups, each with
+the same number of trajectories (i.e., Syn0.1, Syn0.3, Syn0.5, Syn0.7,
+and Syn0.9), where the similarities between each pair of trajectories
+are 0.1 ± 0.05, 0.3 ± 0.05, 0.5 ± 0.05, 0.7 ± 0.05, and 0.9 ± 0.05,
+respectively. The similarity is measured according to the Longest
+Common Road Segment (LCRS) [42]. We generate similar speed
+patterns when trajectories traverse an LCRS. Specifically, any two
+1183
+subsequences of speeds corresponding to an LCRS, denoted as
+𝑠𝑢𝑏(𝑉
+𝑛
+) and 𝑠𝑢𝑏(𝑉
+𝑛
+′
+), satisfy |𝑠𝑢𝑏(𝑉
+𝑛
+)| = |𝑠𝑢𝑏(𝑉
+𝑛
+′
+)| ∧ |𝑠𝑢𝑏(𝑉
+𝑛
+𝑖
+) −
+𝑠𝑢𝑏(𝑉
+𝑛
+′
+𝑖
+)| ≤ 1
+2
+𝜂
+(0 ≤ 𝑖 < |𝑠𝑢𝑏(𝑉
+𝑛
+)|), where 𝜂 = 7. The default
+sample interval of HZ and Syn is 20s, and that of DK is 1s.
+Parameter Setting. In the experiments, we study the effect on
+the performance of the parameters summarized in Table 4. We set
+𝜆 to 0.998 and 𝛾 to 3 on both datasets, and set 𝜂 to 3 on DK and
+7 on HZ, respectively. Note that the default values of parameters
+for Syn are the same as those for HZ. The cardinalities of the hash
+tables for storing 𝐸(Ref) and 𝑉 (Ref), are both 1000. All algorithms
+are implemented in C++ and run on a computer with an Intel Core
+i9-9880H CPU (2.30 GHz) and 32 GB memory.
+Comparison Algorithms. We compare TRACE with three methods: CLEAN [44], OCT-LSTM [5], and OCT [5]. CLEAN is an offline
+method, while OCT-LSTM trains an LSTM model to obtain repetitive patterns of time-distance sequences using historical data. OCTLSTM compresses time-distance sequences by discarding data if the
+prediction deviation is smaller than an error bound. OCT [5] is similar to OCT-LSTM, except that it uses a linear model for prediction
+and does not perform any offline training.
+Performance Metrics. For compression, we use the compression ratio (CR), time delay (Delay), maximum memory cost (MC),
+and transmission cost (TC) as the performance metrics. For query
+processing, we use the query time (Time) and transmission cost
+(TC) as the performance metrics. Specifically, the maximum memory cost records the maximum storage of auxiliary structures (such
+as hash tables) created for compression over all timestamps. The
+auxiliary structures are stored in main memory at the edge server,
+while the compressed data is transmitted to and stored in the centralized cloud. Moreover, both the time delay and transmission cost
+are reported as average values to process an arriving mapped GPS
+point at a timestamp. As the experiments are simulated in a vehicular edge computing architecture, the transmission cost is the size of
+contents to be transferred from the edge server to the centralized
+cloud. The contents include compressed trajectories and indexes,
+thus we use the transmission cost as a performance metric of both
+compression and query processing.
+7.2 Experimental Results
+Comparison and Scalability. Figure 6 reports experimental findings when varying the dataset size from 20% to 100%. We use 80%,
+10%, and 10% of each dataset for training, validation, and testing
+for OCT-LSTM, respectively. Thus, all methods are applied to 10%
+of each dataset in this set of experiments. Since CLEAN is an offline method and takes 192.1 hours to compress 20% Syn, we only
+report its compression ratio and maximum memory cost on HZ
+and 20% Syn. First, TRACE outperforms all the baselines in terms
+of compression ratio and transmission cost. This is mainly due to
+TRACE’s separate compression of paths, speeds, and timestamps
+that eliminates more redundancy. Second, the compression ratios
+of TRACE and OCT-LSTM increase slightly, as more subsequences
+can be referentially compressed and more training data is used. The
+transmission cost of OCT-LSTM is two orders of magnitude higher
+than that of TRACE. The reason is that OCT-LSTM needs to update
+and transmit the model to adapt to new speed patterns. Next, the
+maximum memory cost and time delay of TRACE exceed those of
+OCT-LSTM and OCT. This is in line with TRACE’s goal of achieving
+20 40 60 80 100 0
+10
+20
+30
+C
+R
+Data size (%)
+TRACE OCT
+CLEAN OCT-LSTM
+(a) CR on HZ
+20 40 60 8010010
+-1
+10
+1
+10
+3
+10
+5
+MC
+(
+MB
+)
+Data size (%)
+TRACE OCTCLEAN OCT-LSTM(b) MC on HZ
+20 40 60 80 100 10
+1
+10
+3
+10
+5
+Data size (%)
+T
+C
+(
+b
+i
+t
+)
+TRACE OCT
+OCT-LSTM
+(c) TC on HZ
+20 40 60 8010010
+-3
+10
+-1
+10
+1
+D
+e
+l
+a
+y
+(
+s
+)
+Data size (%)
+TRACE OCTOCT-LSTM(d) Delay on HZ
+20 40 60 80 100 0
+15
+30
+C
+R
+Data size (%)
+TRACE OCT
+CLEAN OCT-LSTM
+(e) CR on Syn
+20 40 60 8010010
+-2
+10
+1
+10
+4
+10
+7
+MC
+(
+MB
+)
+Data size (%)
+TRACE OCTCLEAN OCT-LSTM(f) MC on Syn
+20 40 60 80 100 10
+1
+10
+3
+10
+5
+T
+C
+(
+b
+i
+t
+)
+Data size (%)
+TRACE OCT
+OCT-LSTM
+(g) TC on Syn
+20 40 60 801000
+2
+4
+D
+e
+l
+a
+y
+(
+s
+)
+Data size (%)
+TRACE OCTOCT-LSTM(h) Delay on Syn
+Figure 6: Comparison and scalability.
+high compression ratios without losing mapped GPS points. Hence,
+TRACE needs to maintain references in main memory and needs
+to wait for 𝑘 mapped GPS points to initialize a factor. In contrast,
+OCT-LSTM and OCT trade the accuracy for compression efficiency
+and memory cost, by discarding data that can be predicted within
+an error bound. However, the maximum memory cost of TRACE
+never exceeds 8 MB, which we expect is easily accommodated by
+the edge server layer [29]. The maximum memory cost and the
+processing time of CLEAN are the highest among the four methods.
+However, CLEAN is the best among the baselines in terms of compression ratio; thus, it is a good option if the compression can take
+place offline and the dataset is relatively small. Finally, the time
+delay of TRACE is roughly independent of the dataset size, while
+that of OCT-LSTM drops slightly with more data as fewer models
+are re-trained. The time delay of TRACE on both datasets never
+exceeds its corresponding default sample interval, i.e., 20s, which
+suggests that TRACE supports real-time compression.
+Effect of 𝑘. Figure 7 reports the results when varying 𝑘, the
+length of 𝑘-mers. First, the compression ratios on both DK and
+HZ first increase and then drop. On one hand, a larger 𝑘 results
+in more references due to the higher probability of mismatching
+among longer sequences, which reduces the compression ratio. On
+the other hand, a longer subsequence tends to be encoded into
+one factor, increasing the compression ratio. Second, the maximum
+memory cost increases with 𝑘, because more references lead to more
+𝑘-mers being stored. Next, the transmission cost has an opposite
+trend to the compression ratio. The higher the compression ratio
+we can achieve, the less data is delivered to the centralized cloud.
+1184
+5 7 9 11 13
+22
+24
+26
+C
+R
+The value of k
+CR
+6
+7
+8
+9
+M
+C
+(
+M
+B
+)
+MC
+(a) CR and MC on DK
+5 7 9 11 13
+51
+52
+53
+54
+55
+T
+C
+(
+b
+i
+t
+)
+The value of k
+TC
+0
+1
+2
+D
+e
+l
+a
+y
+(
+s
+)
+Delay
+(b) TC and Delay on DK
+5 10 15 20 25
+18
+22
+26
+30
+C
+R
+The value of k
+CR
+4
+5
+6
+M
+C
+(
+M
+B
+)
+MC
+(c) CR and MC on HZ
+5 10 15 20 25
+44
+46
+48
+T
+C
+(
+b
+i
+t
+)
+The value of k
+TC
+6
+9
+12
+15
+D
+e
+l
+a
+y
+(
+s
+)
+Delay
+(d) TC and Delay on HZ
+Figure 7: Effect of 𝑘. 0.1 0.3 0.5 0.7 0.9
+24
+25
+26
+C
+R
+The value of C
+CR
+6
+7
+8
+M
+C
+(
+M
+B
+)
+1.5
+2.1
+4.5 30.2
+MC
+23.5
+(a) CR and MC on DK
+0.1 0.3 0.5 0.7 0.9
+51
+52
+53
+T
+C
+(
+b
+i
+t
+)
+The value of C
+TC
+0
+1
+2
+D
+e
+l
+a
+y
+(
+s
+)
+0.04 0.08 1.24 2.24
+Delay
+2.15
+(b) TC and Delay on DK
+0.1 0.3 0.5 0.7 0.9
+25
+26
+27
+13.1 10.9 C
+48.1 R
+The value of C
+CR
+61.7
+4
+5
+6
+M
+C
+(
+M
+B
+)
+35.1
+MC
+(c) CR and MC on HZ
+0.1 0.3 0.5 0.7 0.9
+45
+46
+47
+T
+C
+(
+b
+i
+t
+)
+The value of C
+TC
+5
+6
+7
+8
+9
+6.3 10.6 13.3 15.8 D
+e
+l
+a
+y
+(
+s
+)
+2.1
+Delay
+(d) TC and Delay on HZ
+Figure 8: Effect of 𝐶.
+Finally, Figures 7b and 7d show that the time delay increases with
+𝑘 in most cases, as the time to initialize each factor rises.
+Effect of 𝐶. Figure 8 studies the effect of the deletion coefficient
+𝐶 that controls the amount of outdated data. Specifically, the blue
+numbers along with the maximum memory cost in Figures 8a and 8c
+report kmmax
+km %, where kmmax is the maximum number of the 𝑘-mers
+in memory over all timestamps using reference deletion, while km is
+the number without using reference deletion. The figures show that
+reference deletion function reduces the memory cost substantially.
+We also report the average processing time (ms) of the reference
+deletion at each timestamp in Figures 8b and 8d (the blue numbers
+along with the time delay). As observed, the processing time is
+2–4 orders of magnitude less than the time delay. In addition, both
+the compression ratio and the time delay drop with the increasing
+of 𝐶 on both DK and HZ. This is because a larger 𝐶 results in
+more deletions, which reduces the number of 𝑘-mers stored in
+memory. In this case, an upcoming sequence is more likely to be
+assigned as a reference. Since the time delay is mainly caused by
+compressing non-references, it drops with the decrease of nonreferences. However, the drops are smooth because we only delete
+𝑘-mers that are unlikely to be referenced.
+Effect of 𝛼. Figure 9 reports the impact of the rewriting coefficient 𝛼 on the compression performance, where 𝛼 controls the
+frequency of rewriting and “∞” indicates no rewriting. We see that
+the compression ratio of TRACE first increases and then drops with
+the increase of 𝛼 on DK, while it continues to increase with 𝛼 on 22
+23
+24
+25
+2 6 8 ∞
+C
+R
+The value of 
+CR
+4
+6
+7
+8
+MC
+(
+MB
+)
+MC
+(a) CR and MC on DK
+51
+52
+53
+0.11 0.09 0.08 0T
+C
+(
+b
+i
+t
+)
+The value of TC2 4 6 8 ∞0.19
+012Del
+ay(s)Delay(b) TC and Delay on DK
+24
+25
+26
+27
+C
+R
+CR
+2 4 5 ∞
+The value of 
+3
+3
+4
+5
+MC
+(
+MB
+)
+MC
+(c) CR and MC on HZ
+46
+47
+48
+3 4 5 ∞T
+C
+(
+b
+i
+t
+)
+TCThe value of 2
+567891.63 02.23 1.80
+Del
+ay(s)2.67
+Delay(d) TC and Delay on HZ
+Figure 9: Effect of 𝛼. 30
+32
+34
+36
+0.1 0.3 0.5 0.7
+C
+R
+Trajectory similarity
+CR
+0.9
+6
+7
+8
+M
+C
+(
+M
+B
+)
+MC
+(a) CR and MC
+40
+42
+44
+46
+Del
+ay(s)T
+C
+(
+b
+i
+t
+)
+TC0.1 0.3 0.5 0.7
+Trajectory similarity
+0.9135Delay(b) TC and Delay
+Figure 10: Effect of trajectory similarity.
+51
+52
+53
+8
+2
+2.55 2.58 2.64
+T
+2.49
+C
+(
+b
+i
+t
+)
+Number of grid cells
+TRA (TC)
+NOI (TC)
+128
+2 64
+2 32
+2 16
+2
+2.46
+0.2
+0.4
+0.6
+0.8
+T
+i
+m
+e
+(
+m
+s
+)
+TRA (Time)
+NOI (Time)
+(a) TC and query time on HZ
+42
+45
+48
+51
+26 31 36T
+C
+(
+b
+i
+t
+)
+Number of grid cells
+TRA (TC)
+NOI (TC)
+0.20.40.6Ti
+me(
+ms)
+1282 64
+2 32
+2 16
+2 8
+2
+25
+TRA(Time)
+NOI (Time)
+22
+(b) TC and query time on HZ
+Figure 11: Effect of number of grid cells gc.
+HZ. The reason is that subsequences may be identified wrongly
+as being frequent if a small 𝛼 is used, while many truly frequent
+subsequences may be missed if a very large 𝛼 is used. Intuitively,
+the optimal 𝛼 value highly depends on the dataset. Second, the
+maximum memory cost of TRACE drops when 𝛼 = ∞, because
+we do not maintain any auxiliary structures for rewriting in this
+case. Next, the time delay of TRACE follows the opposite trend
+of the compression ratio on both datasets, as it is mainly caused
+by initializing factors. Finally, the blue numbers along with the
+time delay in Figures 9b and 9d are the average processing time
+(ms) of reference rewriting at each timestamp, which are negligible
+compared with the time delay.
+Effect of Trajectory Similarity. We perform TRACE on Syn0.1,
+Syn0.3, Syn0.5, Syn0.7, and Syn0.9, denoted as 0.1, 0.3, 0.5, 0.7, and
+0.9, respectively, to study the impact of trajectory similarities on
+compression. Figure 10 shows that the compression ratio increases
+and that the transmission cost drops as trajectories become more
+similar. Moreover, the maximum memory cost and the time delay
+decrease with the increase of similarity because fewer 𝑘-mers are
+stored and fewer factors are generated. Overall, TRACE achieves
+higher compression performance on datasets with larger similarity,
+due to its referential compression.
+Effect of gc. Figure 11 reports the transmission cost and query
+time when varying the number of grid cells, gc. “TRA” denotes our
+TRACE framework while “NOI” denotes the case of no indexing. It
+is clear that a larger gc results in higher query efficiency and larger
+1185
+transmission cost. The blue numbers along the TRACE query time
+line denote the index creation time (𝜇s), which is the average time
+used on creating/updating indexes for all the arriving locations
+per timestamp. The index creation time increases slightly with a
+finer grid granularity, i.e., larger 𝑔𝑐. This is because TRACE updates
+the grid information of streaming trajectories once this changes
+and then delivers the new information to the centralized cloud
+to improve the query efficiency. However, the grid information
+contributes at most 6.5% to the total transmission cost and the
+index creation time is negligible compared with the time delay.
+8 RELATED WORK
+8.1 Raw Data Compression
+Raw trajectory compression aims to compact trajectories that have
+not been map-matched and targets either offline [6, 26, 45] or online
+settings [8, 18, 27]. REST [45] is the first offline reference-based
+raw trajectory compression framework. Targeting raw trajectories,
+it differs very substantially from TRACE. REST compresses the
+timestamps of a non-reference w.r.t. to that of a reference only
+when their spatial information are matchable, while TRACE referentially compresses different parts of trajectories separately, which
+enables the removal of more redundancy. SQUISH [27] is a representative work that aims at reducing data loss and preserves speed
+information at high accuracy during compression. Deng et al. [8]
+consider direction-preserving compression in streaming settings
+and propose an advanced online DPTS algorithm that achieves high
+compression ratios. Li et al. [18] take into account the special needs
+of real-time surveillance applications and increase the loading speed
+of trajectory data very noticeably. Comprehensive experimental
+evaluations of raw trajectory compression are available [14, 28, 43].
+8.2 Network-constrained Compression
+Network-constrained trajectory compression leverages the underlying road network to improve compression, which also occurs
+either offline or online.
+Offline Mode. Krogh et al. [17] compress a trajectory by storing
+only the first and last edges of each shortest path in a trajectory.
+Ji et al. [13] encode outgoing road segments clockwise based on a
+pre-computed clockwise code table. Sun et al. [11, 32] propose a
+two-stage spatial compression algorithm using shortest path and
+frequent subtrajectory compression. Yang et al. [41] present a very
+compact representation that separates the distance information
+from timestamps. Koide et al. [16] develop a compression technique
+for spatial information of trajectories and support the retrieval of
+subpaths. Sui et al. [33] assign each GPS point to the middle point
+of a segment and propose a road-network partitioning strategy
+on which the compression ratio depends. CLEAN [44] encodes
+trajectories by means of frequent patterns. In particular, CLEAN
+is the first study to perform temporal compression on top of spatial compression and presents novel pattern concatenation and
+generation techniques that always expand the pattern with the
+highest support. However, CLEAN needs to count the support of
+each newly generated pattern in the trajectory dataset. This incurs
+high main memory and running time costs for large datasets, which
+precludes it from running in an online manner. UTCQ [19] targets
+compression of uncertain trajectories; in contrast, TRACE aims to
+compress streaming trajectories in real-time. Specifically, UTCQ
+uses an improved TED representation and develops an FJD function to measure the similarity between trajectory instances and to
+select references in batch mode. Instead, TRACE proposes a more
+compact speed-based representation and adapts 𝑘-mer matching
+for real-time reference selection.
+Online Mode. Four studies exist that target online networkconstrained trajectory compression. Chen et al. [3, 4] present a
+solution that compresses the edge sequences in trajectories by retaining only out-edges with remarkable heading changes and also
+uses frequent paths trained offline to further improve compression. The solution does not consider the compression of temporal
+information and locations of trajectories. ONTRAC [31] uses a 𝑘-
+order Markov model to learn frequent paths and apply them to
+compress incoming edges in real-time. This solution discards the
+mapped GPS points of the original trajectories and only estimates
+the time of traversing an edge using a trained model. OCT-LSTM [5]
+trains models to obtain repetitive movement patterns of the timedistance sequences using historical data and only transfers data
+when predicted values deviate significantly from the actual ones.
+Then, re-training is performed at the centralized cloud and the updated model is transmitted to the edge server layer, incurring a high
+transmission cost. Moreover, OCT-LSTM does not mine frequent
+paths that exist widely and can enhance compression substantially.
+If no historical data exists, OCT-LSTM uses linear prediction, called
+OCT. All the above methods compress trajectories by discarding
+useful information, but TRACE keeps all of them to maintain data
+usability. Moreover, both OCT-LSTM and ONTRAC employ an offline training phase as the foundation for their online compression,
+while TRACE is designed to compress streaming trajectories in a
+fully online fashion, making it more generally usable in practice.
+9 CONCLUSION AND FUTURE WORK
+We propose a new framework for compressing, transmitting, and
+querying streaming network-constrained trajectories in real-time.
+We develop a speed-based and a multiple-references based referential representation to represent trajectories concisely. We propose
+𝑘-mer matching based online reference selection with reference
+deletion and rewriting. Deletion reduces the storage cost, while
+rewriting improves the compression ratio. Moreover, we propose
+a transmission strategy that reduces the transmission cost and
+ensures that compressed trajectories are decodable. Finally, we enable querying of compressed streaming trajectories and provide
+indexing and filtering techniques that accelerate real-time query
+processing. An experimental study using two real-life datasets and
+one synthetic dataset shows that the proposed TRACE framework
+outperforms three baselines [5, 44] in terms of compression ratio
+and transmission cost. In future research, it is of interest to reduce
+the latency and memory cost of online compression and to deploy
+TRACE in a distributed cloud setting.
+ACKNOWLEDGMENTS
+This work was supported in part by the DiCyPS and DIREC centers,
+funded by Innovation Fund Denmark. Lu Chen is the corresponding
+author.
+1186
+REFERENCES
+[1] Tarique Anwar, Chengfei Liu, Hai L Vu, Md Saiful Islam, and Timos Sellis. 2018.
+Capturing the spatiotemporal evolution in road traffic networks. TKDE 30, 8
+(2018), 1426–1439.
+[2] Michel Bierlaire, Jingmin Chen, and Jeffrey Newman. 2013. A probabilistic map
+matching method for smartphone GPS data. TRANSPORT RES C-EMER 26 (2013),
+78–98.
+[3] Chao Chen, Yan Ding, Zhu Wang, Junfeng Zhao, Bin Guo, and Daqing Zhang.
+2019. VTracer: When online vehicle trajectory compression meets mobile edge
+computing. IEEE Syst J 14, 2 (2019), 1635–1646.
+[4] Chao Chen, Yan Ding, Xuefeng Xie, Shu Zhang, Zhu Wang, and Liang Feng.
+2019. TrajCompressor: An online map-matching-based trajectory compression
+framework leveraging vehicle heading direction and change. IEEE Trans. Intell.
+Transport. Syst 21, 5 (2019), 2012–2028.
+[5] Jie Chen, Zhu Xiao, Dong Wang, Daiwu Chen, Vincent Havyarimana, Jing Bai,
+and Hongyang Chen. 2018. Toward Opportunistic Compression and Transmission
+for Private Car Trajectory Data Collection. IEEE Sens. J. 19, 5 (2018), 1925–1935.
+[6] Minjie Chen, Mantao Xu, and Pasi Franti. 2012. A fast 𝑜 (𝑛) multiresolution
+polygonal approximation algorithm for GPS trajectory simplification. TIP 21, 5
+(2012), 2770–2785.
+[7] Yixin Chen and Li Tu. 2007. Density-based clustering for real-time stream data.
+In SIGKDD. 133–142.
+[8] Ze Deng, Wei Han, Lizhe Wang, Rajiv Ranjan, Albert Y Zomaya, and Wei Jie. 2017.
+An efficient online direction-preserving compression approach for trajectory
+streaming data. Future Gener Comput Syst 68 (2017), 150–162.
+[9] Sebastian Deorowicz and Szymon Grabowski. 2011. Robust relative compression
+of genomes with random access. Bioinformatics 27, 21 (2011), 2979–2986.
+[10] Anton Dignös, Michael H Böhlen, and Johann Gamper. 2014. Overlap interval
+partition join. In SIGMOD. 1459–1470.
+[11] Yunheng Han, Weiwei Sun, and Baihua Zheng. 2017. COMPRESS: A comprehensive framework of trajectory compression in road networks. TODS 42, 2 (2017),
+11.
+[12] Gang Hu, Jie Shao, Fenglin Liu, Yuan Wang, and HengTao Shen. 2016. If-matching:
+Towards accurate map-matching with information fusion. TKDE 29, 1 (2016),
+114–127.
+[13] Yudian Ji, Yuda Zang, Wuman Luo, Xibo Zhou, Ye Ding, and Lionel M Ni. 2016.
+Clockwise compression for trajectory data under road network constraints. In
+ICBDA. 472–481.
+[14] Jonathan Muckell, Jeong-Hyon Hwang, Catherine T. Lawson and SS Rav. 2010.
+Algorithms for compressing GPS trajectory data: an empirical evaluation. In
+SIGSPATIAL. 402–405.
+[15] Ken CK Lee, Wang-Chien Lee, Baihua Zheng and Yuan Tian. 2012. ROAD: A
+new spatial object search framework for road networks. TKDE 24, 3 (2012), 547.
+[16] Satoshi Koide, Yukihiro Tadokoro, Chuan Xiao, and Yoshiharu Ishikawa. 2018.
+CiNCT: Compression and retrieval for massive vehicular trajectories via relative
+movement labeling. In ICDE. 1097–1108.
+[17] Benjamin Krogh, Christian S Jensen, and Kristian Torp. 2016. Efficient in-memory
+indexing of network-constrained trajectories. In SIGSPATIAL. 17–26.
+[18] Lin Li, Xuezhi Xia, and Ziqian Xiong. 2019. A Novel Online Trajectory Compression Algorithm for Real-time Trajectory Surveillance Applications. In IMCEC.
+995–999.
+[19] Tianyi Li, Ruikai Huang, Lu Chen, Christian S Jensen, and Torben Bach Pedersen.
+2020. Compression of uncertain trajectories in road networks. PVLDB 13, 7
+(2020), 1050–1063.
+[20] Yushuai Li, David Wenzhong Gao, Wei Gao, Huaguang Zhang, and Jianguo Zhou.
+2020. Double-mode energy management for multi-energy system via distributed
+dynamic event-triggered Newton-Raphson algorithm. IEEE T Smart Grid. 11, 6
+(2020), 5339–5356.
+[21] Yushuai Li, Wenzhong Gao, Wei Gao, Huaguang Zhang, and Jianguo Zhou.
+2020. A distributed double-Newton descent algorithm for cooperative energy
+management of multiple energy bodies in energy internet. IEEE T IND INFORM.
+(2020).
+[22] Yanhong Li, Guohui Li, Jianjun Li, and Kai Yao. 2018. SKQAI: A novel air index for
+spatial keyword query processing in road networks. Inf. Sci. 430 (2018), 17–38.
+[23] Zijian Li, Lei Chen, and Yue Wang. 2019. G*-tree: An efficient spatial index on
+road networks. In ICDE. 268–279.
+[24] Wei Liu, Yu Zheng, Sanjay Chawla, Jing Yuan, and Xie Xing. 2011. Discovering
+spatio-temporal causal interactions in traffic data streams. In SIGKDD. 1010–1018.
+[25] Yuansheng Liu, Hui Peng, Limsoon Wong, and Jinyan Li. 2017. High-speed
+and high-ratio referential genome compression. Bioinformatics 33, 21 (2017),
+3364–3372.
+[26] Cheng Long, Raymond Chi-Wing Wong, and HV Jagadish. 2014. Trajectory
+simplification: on minimizing the direction-based error. PVLDB 8, 1 (2014), 49–
+60.
+[27] Jonathan Muckell, Jeong-Hyon Hwang, Vikram Patil, Catherine T Lawson, Fan
+Ping, and SS Ravi. 2011. SQUISH: an online approach for GPS trajectory compression. In COM.Geo. 1–8.
+[28] Jonathan Muckell, Paul W Olsen, Jeong-Hyon Hwang, SS Ravi, and Catherine T
+Lawson. 2013. A framework for efficient and convenient evaluation of trajectory
+compression algorithms. In COM.Geo. 24–31.
+[29] Salman Raza, Shangguang Wang, Manzoor Ahmed, and Muhammad Rizwan
+Anwar. 2019. A survey on vehicular edge computing: architecture, applications,
+technical issues, and future directions. IEEE Wirel Commun 19, 4 (2019), 2322–
+2358.
+[30] Sankaranarayanan Jagan Samet Hanan and Alborzi Houman. 2008. Scalable
+network distance browsing in spatial databases. In SIGMOD. 43–54.
+[31] Arlei Silva, Ramya Raghavendra, Mudhakar Srivatsa, and Ambuj K Singh. 2016.
+Prediction-based online trajectory compression. arXiv preprint arXiv:1601.06316
+(2016).
+[32] Renchu Song, Weiwei Sun, Baihua Zheng, and Yu Zheng. 2014. PRESS: A novel
+framework of trajectory compression in road networks. PVLDB 7, 9 (2014),
+661–672.
+[33] Peipei Sui and Xiaoyu Yang. 2018. A privacy-preserving compression storage
+method for large trajectory data in road network. J. Grid Comput. 16, 2 (2018),
+229–245.
+[34] Shun Taguchi, Satoshi Koide, and Takayoshi Yoshimura. 2018. Online map
+matching with route prediction. TITS 20, 1 (2018), 338–347.
+[35] Tarique Anwar, Chengfei Liu, Hai L. Vu and Christopher Leckie. 2014. Spatial
+Partitioning of Large Urban Road Networks. In EDBT. 343–354.
+[36] Tarique Anwar, Chengfei Liu, Hai L. Vu and Md Saiful Islam. 2016. Tracking the
+evolution of congestion in dynamic urban road networks. In CIKM. 2323–2328.
+[37] Jukka Teuhola. 1978. A compression method for clustered bit-vectors. INFORM
+PROCESS LETT 7, 6 (1978), 308–311.
+[38] Sebastian Wandelt and Ulf Leser. 2012. Adaptive efficient compression of genomes.
+ALGORITHM MOL BIOL 7, 1 (2012), 30.
+[39] Sebastian Wandelt and Ulf Leser. 2013. FRESCO: Referential compression of
+highly similar sequences. TCBB 10, 5 (2013), 1275–1288.
+[40] Yang Xiang, Wanlei Zhou, and Minyi Guo. 2008. Flexible deterministic packet
+marking: An IP traceback system to find the real source of attacks. IEEE Trans
+Parallel Distrib Syst 20, 4 (2008), 567–580.
+[41] Xiaochun Yang, Bin Wang, Kai Yang, Chengfei Liu, and Baihua Zheng. 2017. A
+novel representation and compression for queries on trajectories in road networks.
+TKDE 30, 4 (2017), 613–629.
+[42] Haitao Yuan and Guoliang Li. 2019. Distributed in-memory trajectory similarity
+search and join on road network. In ICDE. 1262–1273.
+[43] Dongxiang Zhang, Mengting Ding, Dingyu Yang, Yi Liu, Ju Fan, and Heng Tao
+Shen. 2018. Trajectory simplification: an experimental study and quality analysis.
+PVLDB 11, 9 (2018), 934–946.
+[44] Peng Zhao, Qinpei Zhao, Chenxi Zhang, Gong Su, Qi Zhang, and Weixiong Rao.
+2019. CLEAN: frequent pattern-based trajectory spatial-temporal compression
+on road networks. In MDM. 605–610.
+[45] Yan Zhao, Shuo Shang, Yu Wang, Bolong Zheng, Quoc Viet Hung Nguyen, and Kai
+Zheng. 2018. Rest: A reference-based framework for spatio-temporal trajectory
+compression. In SIGKDD. 2797–2806.
+1187
