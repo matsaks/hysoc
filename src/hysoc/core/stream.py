@@ -32,8 +32,28 @@ class TrajectoryStream:
         Yields points from the stream one by one.
         """
         header = pd.read_csv(self.filepath, nrows=0, sep=self.sep)
-        has_id_col = self.mapping.get('obj_id') in header.columns
-        has_road_col = self.mapping.get('road_id') in header.columns
+        header_cols = set(header.columns)
+        
+        # Auto-detect columns if the configured ones are missing
+        variants = {
+            'lat': ['lat', 'latitude', 'y'],
+            'lon': ['lon', 'longitude', 'x'],
+            'timestamp': ['timestamp', 'time', 'datetime', 't', 'date'],
+            'obj_id': ['obj_id', 'oid', 'user_id', 'trajectory_id'],
+            'road_id': ['road_id', 'osm_way_id', 'edge_id']
+        }
+        
+        for key, possible_names in variants.items():
+            current_col = self.mapping.get(key)
+            # If current mapping is invalid/missing in file, try to find an alternative
+            if current_col not in header_cols:
+                for name in possible_names:
+                    if name in header_cols:
+                        self.mapping[key] = name
+                        break
+        
+        has_id_col = self.mapping.get('obj_id') in header_cols
+        has_road_col = self.mapping.get('road_id') in header_cols
 
         with pd.read_csv(self.filepath, chunksize=1000, sep=self.sep) as reader:
             for chunk in reader:
