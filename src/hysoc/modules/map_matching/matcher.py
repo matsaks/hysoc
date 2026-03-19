@@ -7,6 +7,12 @@ import dataclasses
 from hysoc.core.point import Point
 from leuvenmapmatching.matcher.distance import DistanceMatcher
 from leuvenmapmatching.map.inmem import InMemMap
+from hysoc.constants.map_matching_defaults import (
+    WINDOW_SIZE,
+    MAX_DIST_M,
+    MAX_DIST_INIT_M,
+    MIN_PROB_NORM,
+)
 
 
 class OnlineMapMatcher:
@@ -22,10 +28,10 @@ class OnlineMapMatcher:
     def __init__(
         self, 
         G: nx.MultiDiGraph, 
-        window_size: int = 15, 
-        max_dist: float = 50.0,
-        max_dist_init: float = 100.0,
-        min_prob_norm: float = 0.001
+        window_size: int = WINDOW_SIZE,
+        max_dist: float = MAX_DIST_M,
+        max_dist_init: float = MAX_DIST_INIT_M,
+        min_prob_norm: float = MIN_PROB_NORM,
     ):
         """
         Args:

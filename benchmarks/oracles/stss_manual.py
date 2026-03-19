@@ -3,14 +3,19 @@ from math import radians, sin, cos, sqrt, atan2
 
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
+from hysoc.constants.geo_defaults import EARTH_RADIUS_M
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+    STSS_MIN_SAMPLES,
+)
 
 def haversine_distance(p1: Point, p2: Point) -> float:
     """
     Calculate the great circle distance between two points on the earth (specified in decimal degrees)
     Returns distance in meters.
     """
-    # Earth radius in meters
-    R = 6371000.0
+    R = EARTH_RADIUS_M
 
     lat1, lon1 = radians(p1.lat), radians(p1.lon)
     lat2, lon2 = radians(p2.lat), radians(p2.lon)
@@ -30,7 +35,12 @@ class STSSOracleManual:
     based on spatial density, without external ML dependencies.
     """
 
-    def __init__(self, min_samples: int = 2, max_eps: float = 50.0, min_duration_seconds: float = 60.0):
+    def __init__(
+        self,
+        min_samples: int = STSS_MIN_SAMPLES,
+        max_eps: float = STOP_MAX_EPS_METERS,
+        min_duration_seconds: float = STOP_MIN_DURATION_SECONDS,
+    ):
         """
         Args:
             min_samples: Minimum neighbors to form a core point.

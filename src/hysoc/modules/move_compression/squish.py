@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Optional
 import heapq
 import math
 from hysoc.core.point import Point
+from hysoc.constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
 
 @dataclass(order=True)
 class PriorityObject:
@@ -19,7 +20,7 @@ class Node:
         self.removed = False
 
 class SquishCompressor:
-    def __init__(self, capacity: int = 50):
+    def __init__(self, capacity: int = SQUISH_DEFAULT_CAPACITY):
         """
         Initialize the SquishCompressor with a fixed buffer capacity.
         
