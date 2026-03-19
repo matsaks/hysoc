@@ -179,13 +179,7 @@ def main():
     G = ox.graph_from_bbox(bbox=(west, south, east, north), network_type='drive')
     print(f"Graph downloaded. Nodes: {len(G.nodes)}, Edges: {len(G.edges)}")
     
-    matcher = OnlineMapMatcher(
-        G=G, 
-        window_size=15, 
-        max_dist=50, 
-        max_dist_init=100, 
-        min_prob_norm=0.001
-    )
+    matcher = OnlineMapMatcher(G=G)
     
     # We need an iterator for the wrapper, recreating stream to be safe
     stream_again = TrajectoryStream(
