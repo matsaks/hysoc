@@ -11,6 +11,12 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+    STSS_MIN_SAMPLES,
+)
+
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
 from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
@@ -46,7 +52,11 @@ def main():
 
     # 1. Segment using STSS
     print("Running STSSOracleSklearn...")
-    oracle = STSSOracleSklearn(min_samples=5, max_eps=10, min_duration_seconds=10)
+    oracle = STSSOracleSklearn(
+        min_samples=STSS_MIN_SAMPLES,
+        max_eps=STOP_MAX_EPS_METERS,
+        min_duration_seconds=STOP_MIN_DURATION_SECONDS,
+    )
     segments = oracle.process(trajectory)
     print(f"Segmentation complete. Found {len(segments)} segments.")
     

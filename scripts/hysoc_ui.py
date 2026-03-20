@@ -12,6 +12,11 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+)
+
 from hysoc.core.stream import TrajectoryStream
 from hysoc.core.segment import Stop, Move
 from hysoc.modules.segmentation.step import STEPSegmenter
@@ -21,7 +26,14 @@ from hysoc.modules.map_matching.matcher import OnlineMapMatcher
 from hysoc.modules.map_matching.wrapper import MapMatchedStreamWrapper
 
 class HYSOCVisualizer:
-    def __init__(self, filepath, max_eps=20.0, min_duration=30.0, interval=50, batch_size=1):
+    def __init__(
+        self,
+        filepath: str,
+        max_eps: float = STOP_MAX_EPS_METERS,
+        min_duration: float = STOP_MIN_DURATION_SECONDS,
+        interval: int = 50,
+        batch_size: int = 1,
+    ):
         self.filepath = filepath
         self.max_eps = max_eps
         self.min_duration = min_duration
@@ -47,13 +59,7 @@ class HYSOCVisualizer:
         print(f"Graph downloaded. Nodes: {len(self.G.nodes)}, Edges: {len(self.G.edges)}")
         
         # 2. Setup Map Matcher and Streaming Pipeline
-        matcher = OnlineMapMatcher(
-            G=self.G, 
-            window_size=15, 
-            max_dist=50, 
-            max_dist_init=100, 
-            min_prob_norm=0.001
-        )
+        matcher = OnlineMapMatcher(G=self.G)
         
         # Re-initialize stream for actual processing
         self.streamor = TrajectoryStream(filepath, default_obj_id='demo_obj')
@@ -62,7 +68,7 @@ class HYSOCVisualizer:
         
         self.segmenter = STEPSegmenter(max_eps=max_eps, min_duration_seconds=min_duration)
         self.stop_compressor = StopCompressor()
-        self.move_compressor = TraceCompressor(TraceConfig(gamma=10.0))
+        self.move_compressor = TraceCompressor(TraceConfig())
         
         # Stats
         self.total_points = 0

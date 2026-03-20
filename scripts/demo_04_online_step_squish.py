@@ -10,6 +10,11 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+)
+
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
 from hysoc.modules.segmentation.step import STEPSegmenter
@@ -53,8 +58,10 @@ def main():
         return
 
     # Initialize streaming modules
-    # Providing grid_size_meters explicitly for demonstration!
-    segmenter = STEPSegmenter(max_eps=10, min_duration_seconds=10, grid_size_meters=5.0)
+    segmenter = STEPSegmenter(
+        max_eps=STOP_MAX_EPS_METERS,
+        min_duration_seconds=STOP_MIN_DURATION_SECONDS,
+    )
     stop_compressor = StopCompressor()
     move_compressor = SquishCompressor(capacity=50)
 

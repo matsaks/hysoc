@@ -4,17 +4,22 @@ from datetime import datetime
 
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
+from hysoc.constants.geo_defaults import EARTH_RADIUS_M
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+)
+from hysoc.constants.step_defaults import STEP_DEFAULT_GRID_FACTOR
 
 def local_distance(p1: Point, p2: Point) -> float:
     """
     Fast flat-earth distance approximation in meters.
     Adequate for short spatial extents (like detecting local stay-points).
     """
-    R = 6371000.0
     lat_rad = math.radians((p1.lat + p2.lat) / 2.0)
     dx = math.radians(p2.lon - p1.lon) * math.cos(lat_rad)
     dy = math.radians(p2.lat - p1.lat)
-    return R * math.sqrt(dx*dx + dy*dy)
+    return EARTH_RADIUS_M * math.sqrt(dx*dx + dy*dy)
 
 class STEPSegmenter:
     """
@@ -22,7 +27,12 @@ class STEPSegmenter:
     Identifies STOP and MOVE segments on the fly.
     """
 
-    def __init__(self, max_eps: float = 50.0, min_duration_seconds: float = 60.0, grid_size_meters: Optional[float] = None):
+    def __init__(
+        self,
+        max_eps: float = STOP_MAX_EPS_METERS,
+        min_duration_seconds: float = STOP_MIN_DURATION_SECONDS,
+        grid_size_meters: Optional[float] = None,
+    ):
         """
         Args:
             max_eps: Distance threshold D in meters.
@@ -35,7 +45,7 @@ class STEPSegmenter:
         if grid_size_meters is not None and grid_size_meters > 0:
             self.g = grid_size_meters
         else:
-            self.g = (math.sqrt(2) / 4.0) * max_eps
+            self.g = STEP_DEFAULT_GRID_FACTOR * max_eps
             
         self.threshold_sq = (self.max_eps / self.g) ** 2
             
@@ -95,8 +105,12 @@ class STEPSegmenter:
             self.origin_lon = math.radians(p_c.lon)
             
         # Calculate local grid
-        dx_meters = (math.radians(p_c.lon) - self.origin_lon) * 6371000.0 * math.cos(self.origin_lat)
-        dy_meters = (math.radians(p_c.lat) - self.origin_lat) * 6371000.0
+        dx_meters = (
+            (math.radians(p_c.lon) - self.origin_lon)
+            * EARTH_RADIUS_M
+            * math.cos(self.origin_lat)
+        )
+        dy_meters = (math.radians(p_c.lat) - self.origin_lat) * EARTH_RADIUS_M
         gx_c = int(dx_meters // self.g)
         gy_c = int(dy_meters // self.g)
         

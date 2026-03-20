@@ -1,5 +1,12 @@
+import sys
+from pathlib import Path
+
 import pytest
 from datetime import datetime, timedelta
+
+# Ensure the project root is on sys.path so `benchmarks.*` imports work.
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
 from hysoc.core.point import Point
 from hysoc.core.segment import Stop, Move
 from benchmarks.oracles.stss_sklearn import STSSOracleSklearn

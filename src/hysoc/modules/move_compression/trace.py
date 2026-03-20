@@ -3,16 +3,25 @@ from dataclasses import dataclass, field
 from hysoc.core.point import Point
 import collections
 import math
+from hysoc.constants.geo_defaults import EARTH_RADIUS_M
+from hysoc.constants.trace_defaults import (
+    TRACE_GAMMA,
+    TRACE_EPSILON,
+    TRACE_K,
+    TRACE_ALPHA,
+    TRACE_CLEANUP_THRESHOLD,
+    TRACE_DECAY_LAMBDA,
+)
 
 @dataclass
 class TraceConfig:
     """Configuration for TRACE compressor."""
-    gamma: float = 10.0  # Speed threshold
-    epsilon: float = 5.0 # Error bound for prediction
-    k: int = 4           # k-mer length
-    alpha: int = 5       # Threshold for reference rewriting
-    cleanup_threshold: float = 1000.0 # Threshold C for reference deletion
-    decay_lambda: float = 0.9 # Decay factor for freshness
+    gamma: float = TRACE_GAMMA  # Speed threshold
+    epsilon: float = TRACE_EPSILON  # Error bound for prediction
+    k: int = TRACE_K  # k-mer length
+    alpha: int = TRACE_ALPHA  # Threshold for reference rewriting
+    cleanup_threshold: float = TRACE_CLEANUP_THRESHOLD  # Threshold C for reference deletion
+    decay_lambda: float = TRACE_DECAY_LAMBDA  # Decay factor for freshness
 
 @dataclass
 class Reference:
@@ -102,14 +111,13 @@ class TraceCompressor:
 
         def lat_lon_dist(p1: Point, p2: Point) -> float:
             # Equirectangular approximation for speed
-            R = 6371000.0
             lat1 = math.radians(p1.lat)
             lat2 = math.radians(p2.lat)
             dlat = lat2 - lat1
             dlon = math.radians(p2.lon - p1.lon)
             x = dlon * math.cos((lat1 + lat2) / 2.0)
             y = dlat
-            return R * math.sqrt(x*x + y*y)
+            return EARTH_RADIUS_M * math.sqrt(x*x + y*y)
 
         current_road_id = None
         segment_offset = 0.0

@@ -5,6 +5,12 @@ from math import radians
 
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
+from hysoc.constants.geo_defaults import EARTH_RADIUS_M
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+    STSS_MIN_SAMPLES,
+)
 
 class STSSOracleSklearn:
     """
@@ -13,7 +19,12 @@ class STSSOracleSklearn:
     Reference: Liu et al. (2021)
     """
 
-    def __init__(self, min_samples: int = 2, max_eps: float = 50.0, min_duration_seconds: float = 60.0):
+    def __init__(
+        self,
+        min_samples: int = STSS_MIN_SAMPLES,
+        max_eps: float = STOP_MAX_EPS_METERS,
+        min_duration_seconds: float = STOP_MIN_DURATION_SECONDS,
+    ):
         """
         Args:
             min_samples: The number of samples in a neighborhood for a point to be considered as a core point.
@@ -34,7 +45,7 @@ class STSSOracleSklearn:
         
         # Earth radius in meters approximately 6371000
         # max_eps is in meters, convert to radians: dist / radius
-        max_eps_rad = self.max_eps / 6371000.0
+        max_eps_rad = self.max_eps / EARTH_RADIUS_M
 
         clustering = OPTICS(min_samples=self.min_samples, max_eps=max_eps_rad, metric='haversine')
         clustering.fit(coords)

@@ -11,6 +11,12 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
+from hysoc.constants.segmentation_defaults import (
+    STOP_MAX_EPS_METERS,
+    STOP_MIN_DURATION_SECONDS,
+    STSS_MIN_SAMPLES,
+)
+
 from hysoc.core.point import Point
 from hysoc.core.segment import Segment, Stop, Move
 from hysoc.modules.segmentation.step import STEPSegmenter
@@ -169,7 +175,11 @@ def main():
 
     # 1. OFFLINE (STSS)
     print("\n[1] Running STSSOracleSklearn (Offline)...")
-    stss_oracle = STSSOracleSklearn(min_samples=5, max_eps=10, min_duration_seconds=10)
+    stss_oracle = STSSOracleSklearn(
+        min_samples=STSS_MIN_SAMPLES,
+        max_eps=STOP_MAX_EPS_METERS,
+        min_duration_seconds=STOP_MIN_DURATION_SECONDS,
+    )
     stss_segments = stss_oracle.process(trajectory)
     
     stop_compressor = StopCompressor()
@@ -181,7 +191,10 @@ def main():
 
     # 2. ONLINE (STEP)
     print("\n[2] Running STEPSegmenter (Online Streaming)...")
-    step_segmenter = STEPSegmenter(max_eps=10, min_duration_seconds=10, grid_size_meters=5.0)
+    step_segmenter = STEPSegmenter(
+        max_eps=STOP_MAX_EPS_METERS,
+        min_duration_seconds=STOP_MIN_DURATION_SECONDS,
+    )
     move_compressor_step = SquishCompressor(capacity=50) # Use independent compressor
     step_processed = []
     
