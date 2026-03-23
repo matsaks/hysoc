@@ -156,6 +156,7 @@ class STEPSegmenter:
                     self.current_sp_end = Ie
                 else:
                     # Case 1.1: Separated, flush first stay point and in-between move
+                    # Emit in chronological order: STOP first (happened earlier), then MOVE (happened after)
                     sp1_points = self._get_points(self.current_sp_start, self.current_sp_end)
                     segments.append(self._create_stop(sp1_points))
                     
@@ -180,9 +181,14 @@ class STEPSegmenter:
             if self.current_sp_start is not None:
                 p_Ie = self._get_point(self.current_sp_end)
                 if local_distance(p_c, p_Ie) > self.max_eps:
-                    # Case 2.1: Far away from last stay point. Flush stay point.
+                    # Case 2.1: Far away from last stay point. Flush stay point and emit transition move.
                     sp1_points = self._get_points(self.current_sp_start, self.current_sp_end)
                     segments.append(self._create_stop(sp1_points))
+                    
+                    # Emit the move from end of stop to current point (the gap)
+                    move_points = self._get_points(self.current_sp_end + 1, c)
+                    if move_points:
+                        segments.append(Move(points=move_points))
                     
                     self._prune_cache(self.current_sp_end + 1)
                     self.current_sp_start = None
