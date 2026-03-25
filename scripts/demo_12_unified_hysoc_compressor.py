@@ -95,31 +95,25 @@ def plot_compression_results(
     # --- Plot 2: HYSOC-G (Geometric) ---
     print("Plotting HYSOC-G (Geometric)...")
     try:
-        geom_points = compressed_data_g["compressed_points"]
+        geom_points = compressed_data_g.get("reconstructed_points", compressed_data_g["compressed_points"])
         geom_stops = compressed_data_g.get("stops", [])
         geom_move_segments = compressed_data_g.get("move_segments", [])
         
         # Count total move points across all segments
         total_move_points = sum(len(seg) for seg in geom_move_segments)
         
-        # Plot each move segment with its own line (prevents crossing stops)
-        if geom_move_segments:
-            for move_seg in geom_move_segments:
-                if len(move_seg) >= 2:
-                    # Convert to web mercator for plotting
-                    move_pts_gdf = gpd.GeoDataFrame(
-                        [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in move_seg],
-                        crs="EPSG:4326"
-                    ).to_crs(epsg=3857)
-                    
-                    # Draw line connecting the points in this segment
-                    coords = [(geom.x, geom.y) for geom in move_pts_gdf.geometry]
-                    xs = [c[0] for c in coords]
-                    ys = [c[1] for c in coords]
-                    ax_geom.plot(xs, ys, color="blue", linewidth=2, alpha=0.6, zorder=2)
-                    
-                    # Plot points
-                    move_pts_gdf.plot(ax=ax_geom, color="blue", markersize=20, alpha=0.5, zorder=2)
+        # Plot continuous trajectory
+        if len(geom_points) >= 2:
+            geom_pts_gdf = gpd.GeoDataFrame(
+                [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in geom_points],
+                crs="EPSG:4326"
+            ).to_crs(epsg=3857)
+            
+            coords = [(geom.x, geom.y) for geom in geom_pts_gdf.geometry]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax_geom.plot(xs, ys, color="blue", linewidth=2, alpha=0.6, zorder=2)
+            geom_pts_gdf.plot(ax=ax_geom, color="blue", markersize=20, alpha=0.5, zorder=2)
         
         # Plot stops on top (larger, red) - these are the KEY points
         if geom_stops:
@@ -149,31 +143,25 @@ def plot_compression_results(
     # --- Plot 3: HYSOC-N (Network-Semantic) ---
     print("Plotting HYSOC-N (Network-Semantic)...")
     try:
-        net_points = compressed_data_n["compressed_points"]
+        net_points = compressed_data_n.get("reconstructed_points", compressed_data_n["compressed_points"])
         net_stops = compressed_data_n.get("stops", [])
         net_move_segments = compressed_data_n.get("move_segments", [])
         
         # Count total move points across all segments
         total_move_points = sum(len(seg) for seg in net_move_segments)
         
-        # Plot each move segment with its own line (prevents crossing stops)
-        if net_move_segments:
-            for move_seg in net_move_segments:
-                if len(move_seg) >= 2:
-                    # Convert to web mercator for plotting
-                    move_pts_gdf = gpd.GeoDataFrame(
-                        [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in move_seg],
-                        crs="EPSG:4326"
-                    ).to_crs(epsg=3857)
-                    
-                    # Draw line connecting the points in this segment
-                    coords = [(geom.x, geom.y) for geom in move_pts_gdf.geometry]
-                    xs = [c[0] for c in coords]
-                    ys = [c[1] for c in coords]
-                    ax_net.plot(xs, ys, color="orange", linewidth=2, alpha=0.6, zorder=2)
-                    
-                    # Plot points
-                    move_pts_gdf.plot(ax=ax_net, color="orange", markersize=20, alpha=0.5, zorder=2)
+        # Plot continuous trajectory
+        if len(net_points) >= 2:
+            net_pts_gdf = gpd.GeoDataFrame(
+                [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in net_points],
+                crs="EPSG:4326"
+            ).to_crs(epsg=3857)
+            
+            coords = [(geom.x, geom.y) for geom in net_pts_gdf.geometry]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax_net.plot(xs, ys, color="orange", linewidth=2, alpha=0.6, zorder=2)
+            net_pts_gdf.plot(ax=ax_net, color="orange", markersize=20, alpha=0.5, zorder=2)
         
         # Plot stops on top (larger, red) - these are the KEY points
         if net_stops:
@@ -210,45 +198,33 @@ def plot_compression_results(
             ax=ax_both, color="lightgray", markersize=2, alpha=0.2, label="Raw"
         )
 
-        # Geometric move segments - draw each separately
-        geom_move_segments = compressed_data_g.get("move_segments", [])
-        if geom_move_segments:
-            for move_seg in geom_move_segments:
-                if len(move_seg) >= 2:
-                    # Convert to web mercator for plotting
-                    geom_pts_gdf = gpd.GeoDataFrame(
-                        [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in move_seg],
-                        crs="EPSG:4326"
-                    ).to_crs(epsg=3857)
-                    
-                    # Draw line connecting the points in this segment
-                    coords = [(geom.x, geom.y) for geom in geom_pts_gdf.geometry]
-                    xs = [c[0] for c in coords]
-                    ys = [c[1] for c in coords]
-                    ax_both.plot(xs, ys, color="blue", linewidth=1.5, alpha=0.5, zorder=2)
-                    
-                    # Plot points
-                    geom_pts_gdf.plot(ax=ax_both, color="blue", markersize=10, alpha=0.4, zorder=2)
+        # Geometric continuous trajectory
+        geom_points = compressed_data_g.get("reconstructed_points", [])
+        if len(geom_points) >= 2:
+            geom_pts_gdf = gpd.GeoDataFrame(
+                [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in geom_points],
+                crs="EPSG:4326"
+            ).to_crs(epsg=3857)
+            
+            coords = [(geom.x, geom.y) for geom in geom_pts_gdf.geometry]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax_both.plot(xs, ys, color="blue", linewidth=1.5, alpha=0.5, zorder=2)
+            geom_pts_gdf.plot(ax=ax_both, color="blue", markersize=10, alpha=0.4, zorder=2)
 
-        # Network-semantic move segments - draw each separately
-        net_move_segments = compressed_data_n.get("move_segments", [])
-        if net_move_segments:
-            for move_seg in net_move_segments:
-                if len(move_seg) >= 2:
-                    # Convert to web mercator for plotting
-                    net_pts_gdf = gpd.GeoDataFrame(
-                        [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in move_seg],
-                        crs="EPSG:4326"
-                    ).to_crs(epsg=3857)
-                    
-                    # Draw line connecting the points in this segment
-                    coords = [(geom.x, geom.y) for geom in net_pts_gdf.geometry]
-                    xs = [c[0] for c in coords]
-                    ys = [c[1] for c in coords]
-                    ax_both.plot(xs, ys, color="orange", linewidth=1.5, alpha=0.5, zorder=2)
-                    
-                    # Plot points
-                    net_pts_gdf.plot(ax=ax_both, color="orange", markersize=10, alpha=0.4, zorder=2)
+        # Network continuous trajectory
+        net_points = compressed_data_n.get("reconstructed_points", [])
+        if len(net_points) >= 2:
+            net_pts_gdf = gpd.GeoDataFrame(
+                [{"geometry": ShapelyPoint(p.lon, p.lat)} for p in net_points],
+                crs="EPSG:4326"
+            ).to_crs(epsg=3857)
+            
+            coords = [(geom.x, geom.y) for geom in net_pts_gdf.geometry]
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            ax_both.plot(xs, ys, color="orange", linewidth=1.5, alpha=0.5, zorder=2)
+            net_pts_gdf.plot(ax=ax_both, color="orange", markersize=10, alpha=0.4, zorder=2)
         
         # All stops overlaid - large red dots on top (these are identical for both strategies)
         all_stops = compressed_data_g.get("stops", [])
@@ -361,7 +337,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default=os.path.join(project_root, "data", "raw", "subset_50", "4494499.csv"),
+        default=os.path.join(project_root, "data", "raw", "subset_50", "7419868.csv"),
         help="Path to the raw trajectory CSV file.",
     )
     parser.add_argument(
@@ -435,9 +411,9 @@ def main():
 
         config_g = HYSOCConfig(
             move_compression_strategy=CompressionStrategy.GEOMETRIC,
-            stop_max_eps_meters=100.0,
-            stop_min_duration_seconds=30.0,
-            squish_capacity=15,  # Reduced from 100 to compress small moves
+            stop_max_eps_meters=25.0,  # Decreased to consume fewer points into stops
+            stop_min_duration_seconds=30.0,  # Increased waiting time required
+            dp_epsilon_meters=15.0,  # DP max error tolerance in meters
         )
 
         compressor_g = HYSOCCompressor(config=config_g)
@@ -492,6 +468,7 @@ def main():
             "compression_ratio": compressed_g.overall_compression_ratio,
             "stops": stop_points_g,
             "move_segments": move_segments_g,  # Separate move segments (not flattened)
+            "reconstructed_points": compressed_g.get_reconstructed_points(),
         }
 
     # Test HYSOC-N (Network-Semantic)
@@ -502,8 +479,8 @@ def main():
 
         config_n = HYSOCConfig(
             move_compression_strategy=CompressionStrategy.NETWORK_SEMANTIC,
-            stop_max_eps_meters=100.0,
-            stop_min_duration_seconds=30.0,
+            stop_max_eps_meters=25.0,  # Decreased to consume fewer points into stops
+            stop_min_duration_seconds=60.0,  # Increased waiting time required
             osm_graph=G,
             enable_map_matching=True,
         )
@@ -562,6 +539,7 @@ def main():
             "compression_ratio": compressed_n.overall_compression_ratio,
             "stops": stop_points_n,
             "move_segments": move_segments_n,  # Separate move segments (not flattened)
+            "reconstructed_points": compressed_n.get_reconstructed_points(),
         }
 
     # Save metrics
