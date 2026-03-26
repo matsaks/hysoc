@@ -34,6 +34,10 @@ from hysoc.core.stream import TrajectoryStream
 from hysoc.core.point import Point
 from hysoc.modules.hysoc import HYSOCCompressor, HYSOCConfig, CompressionStrategy
 
+# Default demo input file (can be overridden with --input)
+DEFAULT_INPUT_FILE: str = os.path.join("data", "raw", "subset_50", "4494499.csv")
+
+
 
 def plot_compression_results(
     raw_points: List[Point],
@@ -341,7 +345,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default=os.path.join(project_root, "data", "raw", "subset_50", "4494499.csv"),
+        default=os.path.join(project_root, DEFAULT_INPUT_FILE),
         help="Path to the raw trajectory CSV file.",
     )
     parser.add_argument(
@@ -388,7 +392,7 @@ def main():
     print(f"Graph downloaded. Nodes: {len(G.nodes)}, Edges: {len(G.edges)}")
 
     # Create output directory
-    script_name = "demo_12_unified_hysoc_compressor"
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     input_filename = os.path.splitext(os.path.basename(data_path))[0]
     output_dir = os.path.join(
