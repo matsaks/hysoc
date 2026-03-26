@@ -14,6 +14,7 @@ from hysoc.modules.move_compression.trace import TraceConfig
 from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
 from hysoc.constants.segmentation_defaults import STOP_MAX_EPS_METERS, STOP_MIN_DURATION_SECONDS
 from hysoc.constants.hysoc_defaults import HYSOC_DEFAULT_COMPRESS_STOPS
+from hysoc.constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
 
 
 class CompressionStrategy(Enum):
@@ -32,6 +33,7 @@ class HYSOCConfig:
     
     compress_stops: bool = HYSOC_DEFAULT_COMPRESS_STOPS
     
+    squish_buffer_capacity: int = SQUISH_DEFAULT_CAPACITY
     dp_epsilon_meters: float = DP_DEFAULT_EPSILON_METERS
     
     trace_config: TraceConfig = field(default_factory=TraceConfig)
@@ -45,7 +47,7 @@ class CompressedSegment:
     segment_type: str  
     original_segment: Union[Stop, Move]
     compressed_data: Any  
-    compression_ratio: Optional[float] = None
+    compression_factor: Optional[float] = None
 
 
 @dataclass
@@ -55,7 +57,7 @@ class CompressedTrajectory:
     compressed_segments: List[CompressedSegment]
     total_original_points: int
     total_compressed_points: int
-    overall_compression_ratio: float
+    overall_compression_factor: float
     compression_strategy: CompressionStrategy
     timestamp: datetime = field(default_factory=datetime.now)
 
