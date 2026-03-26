@@ -124,9 +124,11 @@ def plot_compression_results(
 
         ctx.add_basemap(ax_geom, source=ctx.providers.CartoDB.Positron)
         ax_geom.set_axis_off()
-        ratio_g = compressed_data_g["compression_ratio"]
+        total_orig = len(raw_points)
+        total_comp_g = len(compressed_data_g["compressed_points"])
+        factor_g = total_orig / total_comp_g if total_comp_g > 0 else 0
         ax_geom.set_title(
-            f"HYSOC-G: Geometric\n{len(geom_stops)} stops + {total_move_points} move points → {ratio_g:.1%} compression",
+            f"HYSOC-G: Geometric\n{len(geom_stops)} stops + {total_move_points} move points → {factor_g:.1f}x compression",
             fontsize=12,
             fontweight="bold",
         )
@@ -172,9 +174,11 @@ def plot_compression_results(
 
         ctx.add_basemap(ax_net, source=ctx.providers.CartoDB.Positron)
         ax_net.set_axis_off()
-        ratio_n = compressed_data_n["compression_ratio"]
+        total_orig = len(raw_points)
+        total_comp_n = len(compressed_data_n["compressed_points"])
+        factor_n = total_orig / total_comp_n if total_comp_n > 0 else 0
         ax_net.set_title(
-            f"HYSOC-N: Network-Semantic\n{len(net_stops)} stops + {total_move_points} move points → {ratio_n:.1%} compression",
+            f"HYSOC-N: Network-Semantic\n{len(net_stops)} stops + {total_move_points} move points → {factor_n:.1f}x compression",
             fontsize=12,
             fontweight="bold",
         )
@@ -337,7 +341,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default=os.path.join(project_root, "data", "raw", "subset_50", "7419868.csv"),
+        default=os.path.join(project_root, "data", "raw", "subset_50", "4494499.csv"),
         help="Path to the raw trajectory CSV file.",
     )
     parser.add_argument(
@@ -433,15 +437,19 @@ def main():
             seg_type = seg.segment_type.upper()
             orig_pts = len(seg.original_segment.points)
             if seg.segment_type == "stop":
-                print(f"    [{i}] {seg_type}: {orig_pts} points → 1 centroid (ratio: {seg.compression_ratio:.1%})")
+                comp_pts = 1
+                factor = orig_pts / comp_pts if comp_pts > 0 else 0
+                print(f"    [{i}] {seg_type}: {orig_pts} points → 1 centroid (factor: {factor:.1f}x)")
             else:
                 comp_pts = len(seg.compressed_data) if isinstance(seg.compressed_data, list) else len(seg.original_segment.points)
-                print(f"    [{i}] {seg_type}: {orig_pts} points → {comp_pts} points (ratio: {seg.compression_ratio:.1%})")
+                factor = orig_pts / comp_pts if comp_pts > 0 else 0
+                print(f"    [{i}] {seg_type}: {orig_pts} points → {comp_pts} points (factor: {factor:.1f}x)")
 
         print(f"\nOverall Compression:")
         print(f"  Original points: {compressed_g.total_original_points}")
         print(f"  Compressed points: {compressed_g.total_compressed_points}")
-        print(f"  Compression ratio: {compressed_g.overall_compression_ratio:.2%}")
+        factor_g = compressed_g.total_original_points / compressed_g.total_compressed_points if compressed_g.total_compressed_points > 0 else 0
+        print(f"  Compression factor: {factor_g:.1f}x")
 
         results["strategies"]["geometric"] = {
             "original_points": compressed_g.total_original_points,
@@ -480,7 +488,7 @@ def main():
         config_n = HYSOCConfig(
             move_compression_strategy=CompressionStrategy.NETWORK_SEMANTIC,
             stop_max_eps_meters=25.0,  # Decreased to consume fewer points into stops
-            stop_min_duration_seconds=60.0,  # Increased waiting time required
+            stop_min_duration_seconds=30.0,  # Increased waiting time required
             osm_graph=G,
             enable_map_matching=True,
         )
@@ -503,16 +511,21 @@ def main():
             seg_type = seg.segment_type.upper()
             orig_pts = len(seg.original_segment.points)
             if seg.segment_type == "stop":
-                print(f"    [{i}] {seg_type}: {orig_pts} points → 1 centroid (ratio: {seg.compression_ratio:.1%})")
+                comp_pts = 1
+                factor = orig_pts / comp_pts if comp_pts > 0 else 0
+                print(f"    [{i}] {seg_type}: {orig_pts} points → 1 centroid (factor: {factor:.1f}x)")
             else:
                 # For TRACE, count unique road IDs as the compressed representation
                 unique_roads = len(set(p.road_id for p in seg.original_segment.points if p.road_id))
-                print(f"    [{i}] {seg_type}: {orig_pts} points → {unique_roads} roads (ratio: {seg.compression_ratio:.1%})")
+                comp_pts = unique_roads if unique_roads > 0 else 1
+                factor = orig_pts / comp_pts if comp_pts > 0 else 0
+                print(f"    [{i}] {seg_type}: {orig_pts} points → {unique_roads} roads (factor: {factor:.1f}x)")
 
         print(f"\nOverall Compression:")
         print(f"  Original points: {compressed_n.total_original_points}")
         print(f"  Compressed points: {compressed_n.total_compressed_points}")
-        print(f"  Compression ratio: {compressed_n.overall_compression_ratio:.2%}")
+        factor_n = compressed_n.total_original_points / compressed_n.total_compressed_points if compressed_n.total_compressed_points > 0 else 0
+        print(f"  Compression factor: {factor_n:.1f}x")
 
         results["strategies"]["network_semantic"] = {
             "original_points": compressed_n.total_original_points,

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 # Speed threshold (gamma in TRACE).
-TRACE_GAMMA: float = 10.0
+TRACE_GAMMA: float = 50.0
 
 # Error bound for prediction (epsilon in TRACE).
-TRACE_EPSILON: float = 5.0
+TRACE_EPSILON: float = 15.0
 
 # k-mer length.
 TRACE_K: int = 4
