@@ -1,0 +1,334 @@
+"""
+HYSOC: Hybrid Trajectory Compression Framework — Main Orchestrator
+
+This module is the central entry point for the HYSOC pipeline.
+It orchestrates the full compression workflow by delegating to:
+  - Module I:    Streaming Segmentation (STEP)         → segmentation/step.py
+  - Module II:   Stop Compression (StopCompressor)     → stop_compression/compressor.py
+  - Module III-A: Move Compression — Geometric (DP)    → move_compression/dp.py
+  - Module III-B: Move Compression — Network-Semantic   → move_compression/trace.py
+
+Run directly:
+    python -m hysoc.modules.hysoc
+"""
+
+import os
+import sys
+import math
+from typing import List, Optional
+
+from hysoc.core.point import Point
+from hysoc.core.segment import Segment, Stop, Move
+from hysoc.core.compression import (
+    CompressionStrategy,
+    HYSOCConfig,
+    CompressedSegment,
+    CompressedTrajectory,
+)
+from hysoc.modules.segmentation.step import STEPSegmenter
+from hysoc.modules.stop_compression.compressor import StopCompressor
+from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
+from hysoc.modules.move_compression.trace import TraceCompressor
+from hysoc.modules.map_matching.matcher import OnlineMapMatcher
+from hysoc.constants.geo_defaults import EARTH_RADIUS_M
+
+# ---------------------------------------------------------------------------
+# Module-level constant for the default demo input file (not in constants/).
+# ---------------------------------------------------------------------------
+DEFAULT_INPUT_FILE: str = os.path.join("data", "raw", "subset_50", "4494499.csv")
+
+
+class HYSOCCompressor:
+    """
+    Unified HYSOC trajectory compression orchestrator.
+
+    Acts as a true streaming pipeline.  As points flow in via ``process_point``,
+    they get map-matched, segmented, and then compressed block-by-block.
+    Memory is kept low as it does not perpetually buffer history.
+    """
+
+    def __init__(self, config: HYSOCConfig = None):
+        self.config = config if config is not None else HYSOCConfig()
+
+        if self.config.move_compression_strategy == CompressionStrategy.NETWORK_SEMANTIC:
+            if self.config.enable_map_matching and self.config.osm_graph is None:
+                raise ValueError(
+                    "NETWORK_SEMANTIC strategy with map matching requires osm_graph."
+                )
+
+        # Module I: Segmentation
+        self.segmenter = STEPSegmenter(
+            max_eps=self.config.stop_max_eps_meters,
+            min_duration_seconds=self.config.stop_min_duration_seconds,
+        )
+
+        # Module II: Stop Compression
+        self.stop_compressor = StopCompressor()
+
+        # Module III: Move Compression
+        if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
+            self.move_compressor = DouglasPeuckerCompressor(
+                epsilon_meters=self.config.dp_epsilon_meters
+            )
+        else:  # NETWORK_SEMANTIC
+            self.move_compressor = TraceCompressor(config=self.config.trace_config)
+
+        # Optional map matcher
+        self.map_matcher: Optional[OnlineMapMatcher] = None
+        if self.config.enable_map_matching and self.config.osm_graph is not None:
+            self.map_matcher = OnlineMapMatcher(self.config.osm_graph)
+
+        # Metrics
+        self._total_points_in = 0
+        self._total_points_compressed = 0
+
+    # ------------------------------------------------------------------
+    # Streaming interface
+    # ------------------------------------------------------------------
+
+    def process_point(self, point: Point) -> List[CompressedSegment]:
+        """
+        Processes a single point through the streaming pipeline.
+        Returns any fully compressed segments that were closed by this point.
+        """
+        self._total_points_in += 1
+
+        # Stage 1: Map Matching
+        if self.map_matcher is not None:
+            matched_point = self.map_matcher.process_point(point)
+            if matched_point is None:
+                return []
+            point = matched_point
+
+        # Stage 2: Segmentation
+        segments = self.segmenter.process_point(point)
+
+        # Stage 3: Compression
+        compressed = []
+        for seg in segments:
+            c_seg = self._compress_segment(seg)
+            if c_seg is not None:
+                compressed.append(c_seg)
+
+        return compressed
+
+    def flush(self) -> List[CompressedSegment]:
+        """Flushes and compresses any remaining buffered segments."""
+        compressed = []
+
+        # Flush map matcher buffers through segmenter
+        if self.map_matcher is not None:
+            for point in self.map_matcher.flush():
+                segments = self.segmenter.process_point(point)
+                for seg in segments:
+                    c_seg = self._compress_segment(seg)
+                    if c_seg is not None:
+                        compressed.append(c_seg)
+
+        # Flush segmenter
+        for seg in self.segmenter.flush():
+            c_seg = self._compress_segment(seg)
+            if c_seg is not None:
+                compressed.append(c_seg)
+
+        return compressed
+
+    # ------------------------------------------------------------------
+    # Batch interface
+    # ------------------------------------------------------------------
+
+    def compress(self, points: List[Point]) -> CompressedTrajectory:
+        """
+        Batch wrapper — pushes all points through the streaming pipeline
+        and collects the result.
+        """
+        self.__init__(self.config)
+
+        compressed_segments = []
+        for point in points:
+            compressed_segments.extend(self.process_point(point))
+        compressed_segments.extend(self.flush())
+
+        ratio = 0.0
+        if self._total_points_in > 0:
+            ratio = (
+                (self._total_points_in - self._total_points_compressed)
+                / self._total_points_in
+            )
+
+        return CompressedTrajectory(
+            original_points=points,
+            compressed_segments=compressed_segments,
+            total_original_points=self._total_points_in,
+            total_compressed_points=self._total_points_compressed,
+            overall_compression_ratio=ratio,
+            compression_strategy=self.config.move_compression_strategy,
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _compress_segment(self, seg: Segment) -> Optional[CompressedSegment]:
+        """Routes a detected segment to the appropriate compressor."""
+        if isinstance(seg, Stop):
+            if self.config.compress_stops:
+                compressed_data = self.stop_compressor.compress(seg.points)
+                total_compressed = 1
+            else:
+                compressed_data = seg
+                total_compressed = len(seg.points)
+
+            compression_ratio = (
+                (len(seg.points) - total_compressed) / len(seg.points)
+                if len(seg.points) > 0
+                else 0.0
+            )
+            self._total_points_compressed += total_compressed
+
+            return CompressedSegment(
+                segment_type="stop",
+                original_segment=seg,
+                compressed_data=compressed_data,
+                compression_ratio=compression_ratio,
+            )
+
+        elif isinstance(seg, Move):
+            if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
+                compressed_data = self.move_compressor.compress(seg.points)
+                total_compressed = len(compressed_data)
+            else:
+                trace_result = self.move_compressor.compress(seg.points)
+                retained_points = self._extract_retained_points_from_trace(seg.points)
+                compressed_data = {
+                    "trace_result": trace_result,
+                    "retained_points": retained_points,
+                }
+                total_compressed = len(retained_points)
+
+            compression_ratio = (
+                (len(seg.points) - total_compressed) / len(seg.points)
+                if len(seg.points) > 0
+                else 0.0
+            )
+            self._total_points_compressed += total_compressed
+
+            return CompressedSegment(
+                segment_type="move",
+                original_segment=seg,
+                compressed_data=compressed_data,
+                compression_ratio=compression_ratio,
+            )
+
+        return None
+
+    def _extract_retained_points_from_trace(self, points: List[Point]) -> List[Point]:
+        """Identifies retained velocity-change points for TRACE rendering."""
+        if not points or len(points) < 2:
+            return points
+
+        retained_points = []
+        gamma = self.config.trace_config.gamma
+
+        def lat_lon_dist(p1: Point, p2: Point) -> float:
+            lat1 = math.radians(p1.lat)
+            lat2 = math.radians(p2.lat)
+            dlat = lat2 - lat1
+            dlon = math.radians(p2.lon - p1.lon)
+            x = dlon * math.cos((lat1 + lat2) / 2.0)
+            y = dlat
+            return EARTH_RADIUS_M * math.sqrt(x * x + y * y)
+
+        current_road_id = None
+        last_stored_speed = -1.0
+
+        for i, p in enumerate(points):
+            if i == 0 or p.road_id != current_road_id:
+                current_road_id = p.road_id
+                retained_points.append(p)
+                last_stored_speed = 0.0
+                continue
+
+            prev_p = points[i - 1]
+            dist = lat_lon_dist(prev_p, p)
+            time_diff = (p.timestamp - prev_p.timestamp).total_seconds()
+
+            if time_diff > 0:
+                current_speed = dist / time_diff
+            else:
+                current_speed = last_stored_speed
+
+            if abs(current_speed - last_stored_speed) > gamma:
+                retained_points.append(p)
+                last_stored_speed = current_speed
+
+        if retained_points and retained_points[-1] != points[-1]:
+            retained_points.append(points[-1])
+
+        return retained_points
+
+    def get_compression_summary(self) -> str:
+        """Returns a human-readable summary of the current configuration."""
+        lines = [
+            "=" * 60,
+            "HYSOC Compression Configuration",
+            "=" * 60,
+            f"Segmentation: STEP (ε={self.config.stop_max_eps_meters}m, "
+            f"T={self.config.stop_min_duration_seconds}s)",
+            f"Stop Compression: {'Enabled' if self.config.compress_stops else 'Disabled'}",
+            f"Move Compression: {self.config.move_compression_strategy.value.upper()}",
+        ]
+
+        if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
+            lines.append(
+                f"  - DouglasPeuckerCompressor with epsilon {self.config.dp_epsilon_meters}m"
+            )
+        else:
+            lines.append("  - TraceCompressor (Network-Semantic)")
+            lines.append(
+                f"  - Map Matching: {'Enabled' if self.config.enable_map_matching else 'Disabled'}"
+            )
+
+        lines.append("=" * 60)
+        return "\n".join(lines)
+
+
+# ======================================================================
+# Main entry point
+# ======================================================================
+
+def main(input_file: Optional[str] = None):
+    """Loads the default trajectory file and runs the full HYSOC pipeline."""
+    from hysoc.core.stream import TrajectoryStream
+
+    project_root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    )
+    if input_file:
+        data_path = os.path.abspath(input_file)
+    else:
+        data_path = os.path.join(project_root, DEFAULT_INPUT_FILE)
+
+    if not os.path.exists(data_path):
+        print(f"File not found: {data_path}")
+        return
+
+    stream = TrajectoryStream(
+        filepath=data_path,
+        col_mapping={"lat": "latitude", "lon": "longitude", "timestamp": "time"},
+    )
+    points = list(stream.stream())
+
+    config = HYSOCConfig(
+        move_compression_strategy=CompressionStrategy.GEOMETRIC,
+    )
+    compressor = HYSOCCompressor(config=config)
+    result = compressor.compress(points)
+
+    print(f"Compressed {result.total_original_points} → {result.total_compressed_points} points "
+          f"({len(result.compressed_segments)} segments)")
+
+
+if __name__ == "__main__":
+    main()
+
