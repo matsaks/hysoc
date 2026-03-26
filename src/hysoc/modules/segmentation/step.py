@@ -156,6 +156,7 @@ class STEPSegmenter:
                     self.current_sp_end = Ie
                 else:
                     # Case 1.1: Separated, flush first stay point and in-between move
+                    # Emit in chronological order: STOP first (happened earlier), then MOVE (happened after)
                     sp1_points = self._get_points(self.current_sp_start, self.current_sp_end)
                     segments.append(self._create_stop(sp1_points))
                     
@@ -183,6 +184,9 @@ class STEPSegmenter:
                     # Case 2.1: Far away from last stay point. Flush stay point.
                     sp1_points = self._get_points(self.current_sp_start, self.current_sp_end)
                     segments.append(self._create_stop(sp1_points))
+                    
+                    # DO NOT EMIT THE MOVE YET. The move is ongoing until the next stop or flush.
+                    # We leave the ongoing move points (from current_sp_end + 1 to c) in the cache.
                     
                     self._prune_cache(self.current_sp_end + 1)
                     self.current_sp_start = None
