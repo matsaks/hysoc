@@ -458,7 +458,7 @@ def main():
         results["strategies"]["geometric"] = {
             "original_points": compressed_g.total_original_points,
             "compressed_points": compressed_g.total_compressed_points,
-            "compression_ratio": compressed_g.overall_compression_ratio,
+            "compression_ratio": factor_g,
             "num_segments": len(compressed_g.compressed_segments),
             "num_stops": stops_count,
             "num_moves": moves_count,
@@ -477,7 +477,7 @@ def main():
 
         compressed_data_g = {
             "compressed_points": all_points_g,
-            "compression_ratio": compressed_g.overall_compression_ratio,
+            "compression_ratio": factor_g,
             "stops": stop_points_g,
             "move_segments": move_segments_g,  # Separate move segments (not flattened)
             "reconstructed_points": compressed_g.get_reconstructed_points(),
@@ -534,7 +534,7 @@ def main():
         results["strategies"]["network_semantic"] = {
             "original_points": compressed_n.total_original_points,
             "compressed_points": compressed_n.total_compressed_points,
-            "compression_ratio": compressed_n.overall_compression_ratio,
+            "compression_ratio": factor_n,
             "num_segments": len(compressed_n.compressed_segments),
             "num_stops": stops_count,
             "num_moves": moves_count,
@@ -553,7 +553,7 @@ def main():
 
         compressed_data_n = {
             "compressed_points": all_points_n,
-            "compression_ratio": compressed_n.overall_compression_ratio,
+            "compression_ratio": factor_n,
             "stops": stop_points_n,
             "move_segments": move_segments_n,  # Separate move segments (not flattened)
             "reconstructed_points": compressed_n.get_reconstructed_points(),

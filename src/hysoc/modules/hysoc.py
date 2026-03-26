@@ -5,7 +5,7 @@ This module is the central entry point for the HYSOC pipeline.
 It orchestrates the full compression workflow by delegating to:
   - Module I:    Streaming Segmentation (STEP)         → segmentation/step.py
   - Module II:   Stop Compression (StopCompressor)     → stop_compression/compressor.py
-  - Module III-A: Move Compression — Geometric (DP)    → move_compression/dp.py
+  - Module III-A: Move Compression — Geometric (SQUISH+DP) → move_compression/squish.py + dp.py
   - Module III-B: Move Compression — Network-Semantic   → move_compression/trace.py
 
 Run directly:
@@ -27,6 +27,7 @@ from hysoc.core.compression import (
 )
 from hysoc.modules.segmentation.step import STEPSegmenter
 from hysoc.modules.stop_compression.compressor import StopCompressor
+from hysoc.modules.move_compression.squish import SquishCompressor
 from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
 from hysoc.modules.move_compression.trace import TraceCompressor
 from hysoc.modules.map_matching.matcher import OnlineMapMatcher
@@ -67,7 +68,10 @@ class HYSOCCompressor:
 
         # Module III: Move Compression
         if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
-            self.move_compressor = DouglasPeuckerCompressor(
+            self.squish_compressor = SquishCompressor(
+                capacity=self.config.squish_buffer_capacity
+            )
+            self.dp_compressor = DouglasPeuckerCompressor(
                 epsilon_meters=self.config.dp_epsilon_meters
             )
         else:  # NETWORK_SEMANTIC
@@ -149,19 +153,16 @@ class HYSOCCompressor:
             compressed_segments.extend(self.process_point(point))
         compressed_segments.extend(self.flush())
 
-        ratio = 0.0
-        if self._total_points_in > 0:
-            ratio = (
-                (self._total_points_in - self._total_points_compressed)
-                / self._total_points_in
-            )
+        factor = 0.0
+        if self._total_points_compressed > 0:
+            factor = self._total_points_in / self._total_points_compressed
 
         return CompressedTrajectory(
             original_points=points,
             compressed_segments=compressed_segments,
             total_original_points=self._total_points_in,
             total_compressed_points=self._total_points_compressed,
-            overall_compression_ratio=ratio,
+            overall_compression_factor=factor,
             compression_strategy=self.config.move_compression_strategy,
         )
 
@@ -179,9 +180,9 @@ class HYSOCCompressor:
                 compressed_data = seg
                 total_compressed = len(seg.points)
 
-            compression_ratio = (
-                (len(seg.points) - total_compressed) / len(seg.points)
-                if len(seg.points) > 0
+            compression_factor = (
+                len(seg.points) / total_compressed
+                if total_compressed > 0
                 else 0.0
             )
             self._total_points_compressed += total_compressed
@@ -190,12 +191,13 @@ class HYSOCCompressor:
                 segment_type="stop",
                 original_segment=seg,
                 compressed_data=compressed_data,
-                compression_ratio=compression_ratio,
+                compression_factor=compression_factor,
             )
 
         elif isinstance(seg, Move):
             if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
-                compressed_data = self.move_compressor.compress(seg.points)
+                squish_result = self.squish_compressor.compress(seg.points)
+                compressed_data = self.dp_compressor.compress(squish_result)
                 total_compressed = len(compressed_data)
             else:
                 trace_result = self.move_compressor.compress(seg.points)
@@ -206,9 +208,9 @@ class HYSOCCompressor:
                 }
                 total_compressed = len(retained_points)
 
-            compression_ratio = (
-                (len(seg.points) - total_compressed) / len(seg.points)
-                if len(seg.points) > 0
+            compression_factor = (
+                len(seg.points) / total_compressed
+                if total_compressed > 0
                 else 0.0
             )
             self._total_points_compressed += total_compressed
@@ -217,7 +219,7 @@ class HYSOCCompressor:
                 segment_type="move",
                 original_segment=seg,
                 compressed_data=compressed_data,
-                compression_ratio=compression_ratio,
+                compression_factor=compression_factor,
             )
 
         return None
@@ -281,7 +283,8 @@ class HYSOCCompressor:
 
         if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
             lines.append(
-                f"  - DouglasPeuckerCompressor with epsilon {self.config.dp_epsilon_meters}m"
+                f"  - SquishCompressor (capacity={self.config.squish_buffer_capacity}) → "
+                f"DouglasPeuckerCompressor (ε={self.config.dp_epsilon_meters}m)"
             )
         else:
             lines.append("  - TraceCompressor (Network-Semantic)")

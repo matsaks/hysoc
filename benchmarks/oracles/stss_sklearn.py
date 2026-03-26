@@ -10,6 +10,8 @@ from hysoc.constants.segmentation_defaults import (
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
     STSS_MIN_SAMPLES,
+    STSS_MAX_EPS_METERS,
+    STSS_MIN_DURATION_SECONDS,
 )
 
 class STSSOracleSklearn:
@@ -22,8 +24,8 @@ class STSSOracleSklearn:
     def __init__(
         self,
         min_samples: int = STSS_MIN_SAMPLES,
-        max_eps: float = STOP_MAX_EPS_METERS,
-        min_duration_seconds: float = STOP_MIN_DURATION_SECONDS,
+        max_eps: float = STSS_MAX_EPS_METERS,
+        min_duration_seconds: float = STSS_MIN_DURATION_SECONDS,
     ):
         """
         Args:
