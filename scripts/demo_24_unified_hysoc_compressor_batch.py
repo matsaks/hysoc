@@ -24,10 +24,10 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
-from hysoc.core.point import Point
-from hysoc.core.stream import TrajectoryStream
-from hysoc.modules.hysoc import CompressionStrategy, HYSOCCompressor, HYSOCConfig
+from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
+from core.point import Point
+from core.stream import TrajectoryStream
+from hysoc.hysocG import CompressionStrategy, HYSOCCompressor, HYSOCConfig
 
 DEFAULT_INPUT_DIR: str = os.path.join("data", "raw", "London_Final_100")
 

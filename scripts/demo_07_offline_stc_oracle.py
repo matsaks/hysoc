@@ -10,9 +10,9 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.core.stream import TrajectoryStream
-from hysoc.core.segment import Move
-from benchmarks.oracles.stc import STCOracle
+from core.stream import TrajectoryStream
+from core.segment import Move
+from oracle.oracleN import STCOracle
 
 def main():
     # 1. Load Data

@@ -17,24 +17,24 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
-from hysoc.constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
-from hysoc.constants.segmentation_defaults import (
+from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
+from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
+from constants.segmentation_defaults import (
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
     STSS_MIN_SAMPLES,
 )
-from hysoc.core.point import Point
-from hysoc.core.segment import Move, Stop
-from hysoc.metrics import calculate_sed_stats
-from hysoc.modules.move_compression.hybrid_squish_dp import (
+from core.point import Point
+from core.segment import Move, Stop
+from eval import calculate_sed_stats
+from engines.move_compression.hybrid_squish_dp import (
     HybridSquishDPCompressor,
     HybridSquishDPConfig,
 )
-from hysoc.modules.move_compression.squish import SquishCompressor
-from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
-from benchmarks.oracles.dp import DPOracle
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from engines.move_compression.squish import SquishCompressor
+from engines.stop_compression.compressor import CompressedStop, StopCompressor
+from oracle.dpOracle import DPOracle
+from oracle.oracleG import STSSOracleSklearn
 
 
 DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "subset_50")

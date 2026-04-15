@@ -26,18 +26,18 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from benchmarks.oracles.stc import STCOracle
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
-from hysoc.constants.segmentation_defaults import (
+from oracle.oracleN import STCOracle
+from oracle.oracleG import STSSOracleSklearn
+from constants.segmentation_defaults import (
     STSS_MIN_SAMPLES,
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
-from hysoc.core.compression import CompressionStrategy, HYSOCConfig
-from hysoc.core.point import Point
-from hysoc.core.segment import Move, Stop
-from hysoc.metrics.sed import calculate_sed_error, calculate_sed_stats
-from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
+from core.compression import CompressionStrategy, HYSOCConfig
+from core.point import Point
+from core.segment import Move, Stop
+from eval.sed import calculate_sed_error, calculate_sed_stats
+from engines.stop_compression.compressor import CompressedStop, StopCompressor
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_25_oracle_n_hysoc_n_diagnostics")
 DEFAULT_INPUT_DIR = os.path.join("data", "raw", "London_Final_100")
@@ -121,7 +121,7 @@ def reconstruct_for_sed(items: List[object]) -> Tuple[List[Point], int]:
 
 
 def map_match_points_with_diag(raw_points: List[Point], graph) -> Tuple[List[Point], Dict[str, Any]]:
-    from hysoc.modules.map_matching.matcher import OnlineMapMatcher
+    from engines.map_matching.matcher import OnlineMapMatcher
 
     matcher = OnlineMapMatcher(graph)
     matched: List[Point] = []
@@ -389,7 +389,7 @@ def main() -> None:
     parser.add_argument("--no-overlay-plot", action="store_true")
     args = parser.parse_args()
 
-    from hysoc.modules.hysoc import HYSOCCompressor
+    from hysoc.hysocG import HYSOCCompressor
 
     input_dir = _to_abs_path(args.input_dir)
     if not os.path.isdir(input_dir):

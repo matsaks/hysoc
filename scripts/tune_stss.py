@@ -8,9 +8,9 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 sys.path.append(str(project_root / "src"))
 
-from hysoc.core.point import Point
-from hysoc.core.segment import Stop, Move
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from core.point import Point
+from core.segment import Stop, Move
+from oracle.oracleG import STSSOracleSklearn
 
 def load_trajectory(filepath):
     df = pd.read_csv(filepath)

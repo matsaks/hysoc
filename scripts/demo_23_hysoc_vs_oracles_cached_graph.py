@@ -33,22 +33,22 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
-from hysoc.constants.segmentation_defaults import (
+from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
+from constants.segmentation_defaults import (
     STSS_MIN_SAMPLES,
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
-from hysoc.constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
-from hysoc.core.compression import CompressionStrategy, HYSOCConfig
-from hysoc.core.point import Point
-from hysoc.core.segment import Move, Stop
-from hysoc.metrics import calculate_sed_stats
-from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
-from hysoc.modules.move_compression.squish import SquishCompressor
-from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
-from benchmarks.oracles.stc import STCOracle
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
+from core.compression import CompressionStrategy, HYSOCConfig
+from core.point import Point
+from core.segment import Move, Stop
+from eval import calculate_sed_stats
+from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.move_compression.squish import SquishCompressor
+from engines.stop_compression.compressor import CompressedStop, StopCompressor
+from oracle.oracleN import STCOracle
+from oracle.oracleG import STSSOracleSklearn
 from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_23_hysoc_vs_oracles_cached_graph")
@@ -189,7 +189,7 @@ def compute_hysoc_metrics(original: List[Point], compressed_trajectory, latency_
 
 
 def map_match_points(raw_points: List[Point], graph) -> List[Point]:
-    from hysoc.modules.map_matching.matcher import OnlineMapMatcher
+    from engines.map_matching.matcher import OnlineMapMatcher
 
     matcher = OnlineMapMatcher(graph)
     matched: List[Point] = []
@@ -380,7 +380,7 @@ def main() -> None:
     parser.add_argument("--output-root", default=DEFAULT_OUTPUT_ROOT)
     args = parser.parse_args()
 
-    from hysoc.modules.hysoc import HYSOCCompressor
+    from hysoc.hysocG import HYSOCCompressor
 
     input_dir = _to_abs_path(args.input_dir)
     if not os.path.isdir(input_dir):

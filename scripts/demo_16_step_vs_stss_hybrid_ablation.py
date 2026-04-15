@@ -16,21 +16,21 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
-from hysoc.constants.segmentation_defaults import (
+from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
+from constants.segmentation_defaults import (
     STSS_MIN_SAMPLES,
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
-from hysoc.constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
-from hysoc.core.point import Point
-from hysoc.core.segment import Move, Stop
-from hysoc.metrics import calculate_sed_stats
-from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
-from hysoc.modules.move_compression.squish import SquishCompressor
-from hysoc.modules.segmentation.step import STEPSegmenter
-from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
+from core.point import Point
+from core.segment import Move, Stop
+from eval import calculate_sed_stats
+from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.move_compression.squish import SquishCompressor
+from engines.segmentation.step import STEPSegmenter
+from engines.stop_compression.compressor import CompressedStop, StopCompressor
+from oracle.oracleG import STSSOracleSklearn
 from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 

@@ -30,9 +30,9 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.core.stream import TrajectoryStream
-from hysoc.core.point import Point
-from hysoc.modules.hysoc import HYSOCCompressor, HYSOCConfig, CompressionStrategy
+from core.stream import TrajectoryStream
+from core.point import Point
+from hysoc.hysocG import HYSOCCompressor, HYSOCConfig, CompressionStrategy
 
 # Default demo input file (can be overridden with --input)
 DEFAULT_INPUT_FILE: str = os.path.join("data", "raw", "subset_50", "4494499.csv")

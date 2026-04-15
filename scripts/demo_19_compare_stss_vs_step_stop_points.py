@@ -16,17 +16,17 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.segmentation_defaults import (
+from constants.segmentation_defaults import (
     STSS_MIN_SAMPLES,
     STSS_MAX_EPS_METERS,
     STSS_MIN_DURATION_SECONDS,
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
-from hysoc.core.point import Point
-from hysoc.core.segment import Move, Stop
-from hysoc.modules.segmentation.step import STEPSegmenter
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from core.point import Point
+from core.segment import Move, Stop
+from engines.segmentation.step import STEPSegmenter
+from oracle.oracleG import STSSOracleSklearn
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_19_compare_stss_vs_step")
 DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "subset_50")

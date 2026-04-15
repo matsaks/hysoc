@@ -12,9 +12,9 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.core.stream import TrajectoryStream
-from hysoc.modules.map_matching.matcher import OnlineMapMatcher
-from hysoc.modules.map_matching.wrapper import MapMatchedStreamWrapper
+from core.stream import TrajectoryStream
+from engines.map_matching.matcher import OnlineMapMatcher
+from engines.map_matching.wrapper import MapMatchedStreamWrapper
 
 def plot_matching_results(raw_points, matched_points, G, output_img, input_filename):
     """Generates a side-by-side plot of raw GPS vs matched road sequences."""

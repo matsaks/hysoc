@@ -12,18 +12,18 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.segmentation_defaults import (
+from constants.segmentation_defaults import (
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
 
-from hysoc.core.stream import TrajectoryStream
-from hysoc.core.segment import Stop, Move
-from hysoc.modules.segmentation.step import STEPSegmenter
-from hysoc.modules.stop_compression.compressor import StopCompressor
-from hysoc.modules.move_compression.trace import TraceCompressor, TraceConfig
-from hysoc.modules.map_matching.matcher import OnlineMapMatcher
-from hysoc.modules.map_matching.wrapper import MapMatchedStreamWrapper
+from core.stream import TrajectoryStream
+from core.segment import Stop, Move
+from engines.segmentation.step import STEPSegmenter
+from engines.stop_compression.compressor import StopCompressor
+from engines.move_compression.trace import TraceCompressor, TraceConfig
+from engines.map_matching.matcher import OnlineMapMatcher
+from engines.map_matching.wrapper import MapMatchedStreamWrapper
 
 class HYSOCVisualizer:
     def __init__(

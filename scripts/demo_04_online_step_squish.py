@@ -10,17 +10,17 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.segmentation_defaults import (
+from constants.segmentation_defaults import (
     STOP_MAX_EPS_METERS,
     STOP_MIN_DURATION_SECONDS,
 )
 
-from hysoc.core.point import Point
-from hysoc.core.segment import Segment, Stop, Move
-from hysoc.modules.segmentation.step import STEPSegmenter
-from hysoc.modules.stop_compression.compressor import StopCompressor, CompressedStop
-from hysoc.modules.move_compression.squish import SquishCompressor
-from hysoc.metrics import calculate_compression_ratio, calculate_sed_stats
+from core.point import Point
+from core.segment import Segment, Stop, Move
+from engines.segmentation.step import STEPSegmenter
+from engines.stop_compression.compressor import StopCompressor, CompressedStop
+from engines.move_compression.squish import SquishCompressor
+from eval import calculate_compression_ratio, calculate_sed_stats
 
 def load_trajectory(filepath: str) -> list[Point]:
     points = []

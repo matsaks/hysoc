@@ -1,13 +1,13 @@
 import unittest
 from datetime import datetime, timedelta
 
-from hysoc.core.point import Point
-from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
-from hysoc.modules.move_compression.hybrid_squish_dp import (
+from core.point import Point
+from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.move_compression.hybrid_squish_dp import (
     HybridSquishDPCompressor,
     HybridSquishDPConfig,
 )
-from hysoc.modules.move_compression.squish import SquishCompressor
+from engines.move_compression.squish import SquishCompressor
 
 
 class TestHybridSquishDPCompressor(unittest.TestCase):

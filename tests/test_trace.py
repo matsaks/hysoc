@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime, timedelta
 import math
-from hysoc.modules.move_compression.trace import TraceCompressor, TraceConfig
-from hysoc.core.point import Point
+from engines.move_compression.trace import TraceCompressor, TraceConfig
+from core.point import Point
 
 class TestTraceCompressor(unittest.TestCase):
 

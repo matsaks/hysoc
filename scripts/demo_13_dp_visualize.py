@@ -15,10 +15,10 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
-from hysoc.core.point import Point
-from hysoc.metrics import calculate_sed_stats, calculate_compression_ratio
-from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
+from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
+from core.point import Point
+from eval import calculate_sed_stats, calculate_compression_ratio
+from engines.move_compression.dp import DouglasPeuckerCompressor
 
 
 # Defaults (used by this demo; change here for a different trajectory/epsilon).

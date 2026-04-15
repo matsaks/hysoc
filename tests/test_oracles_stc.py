@@ -1,8 +1,8 @@
 import pytest
 from datetime import datetime
-from hysoc.core.point import Point
-from hysoc.core.segment import Move
-from benchmarks.oracles.stc import STCOracle
+from core.point import Point
+from core.segment import Move
+from oracle.oracleN import STCOracle
 
 
 def test_stc_oracle_length():

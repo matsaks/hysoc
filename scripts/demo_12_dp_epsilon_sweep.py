@@ -16,9 +16,9 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from hysoc.core.point import Point
-from hysoc.metrics import calculate_sed_stats
-from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
+from core.point import Point
+from eval import calculate_sed_stats
+from engines.move_compression.dp import DouglasPeuckerCompressor
 
 
 def load_trajectory(filepath: str, obj_id: str) -> List[Point]:

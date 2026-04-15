@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
-from hysoc.core.point import Point
-from hysoc.modules.stop_compression.compressor import StopCompressor
+from core.point import Point
+from engines.stop_compression.compressor import StopCompressor
 
 class TestStopCompression(unittest.TestCase):
     def test_compress_centroid_and_structure(self):

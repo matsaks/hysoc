@@ -2,8 +2,8 @@ import pytest
 from datetime import datetime
 import networkx as nx
 
-from hysoc.core.point import Point
-from hysoc.modules.map_matching.matcher import OnlineMapMatcher
+from core.point import Point
+from engines.map_matching.matcher import OnlineMapMatcher
 
 def get_test_graph():
     G = nx.MultiDiGraph()
@@ -61,7 +61,7 @@ def test_online_map_matcher():
     assert results[0].obj_id == "1"
 
 def test_map_matched_stream_wrapper():
-    from hysoc.modules.map_matching.wrapper import MapMatchedStreamWrapper
+    from engines.map_matching.wrapper import MapMatchedStreamWrapper
     
     G = get_test_graph()
     matcher = OnlineMapMatcher(

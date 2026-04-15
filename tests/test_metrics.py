@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime, timedelta
 import math
-from hysoc.core.point import Point
-from hysoc.metrics import calculate_compression_ratio, calculate_sed_stats, calculate_sed_error
+from core.point import Point
+from eval import calculate_compression_ratio, calculate_sed_stats, calculate_sed_error
 
 class TestTrajectoryMetrics(unittest.TestCase):
     def setUp(self):

@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 # Ensure the project root is on sys.path so `benchmarks.*` imports work.
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
-from hysoc.core.point import Point
-from hysoc.core.segment import Stop, Move
-from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
-from benchmarks.oracles.stss_manual import STSSOracleManual
+from core.point import Point
+from core.segment import Stop, Move
+from oracle.oracleG import STSSOracleSklearn
+from oracle.oracleG import STSSOracleManual
 
 @pytest.fixture
 def synthetic_trajectory():
