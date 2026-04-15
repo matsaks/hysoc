@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from hysoc.core.point import Point
 import collections
 import math
+import time
 from hysoc.constants.geo_defaults import EARTH_RADIUS_M
 from hysoc.constants.trace_defaults import (
     TRACE_GAMMA,
@@ -58,6 +59,26 @@ class TraceCompressor:
         # Inverted index for k-mer matching: k-mer hash -> list of (ref_id, offset, type)
         # Type is 'E' or 'V'
         self.kmer_index: Dict[int, List[Tuple[int, int, str]]] = collections.defaultdict(list)
+        self.diagnostics: Dict[str, Any] = {
+            "compress_calls": 0,
+            "input_points": 0,
+            "speed_rep_points": 0,
+            "speed_rep_reduction_ratio": 0.0,
+            "compress_total_time_s": 0.0,
+            "speed_rep_time_s": 0.0,
+            "referential_time_s": 0.0,
+            "reference_manage_time_s": 0.0,
+            "reference_delete_time_s": 0.0,
+            "factor_count_e": 0,
+            "factor_count_v": 0,
+            "tuple_match_factors_e": 0,
+            "tuple_match_factors_v": 0,
+            "literal_factors_e": 0,
+            "literal_factors_v": 0,
+            "references_count": 0,
+            "kmer_bucket_count": 0,
+            "kmer_entry_count": 0,
+        }
 
     def compress(self, points: List[Point]) -> Any:
         """
@@ -71,14 +92,26 @@ class TraceCompressor:
         """
         if not points:
             return None
+        self.diagnostics["compress_calls"] += 1
+        self.diagnostics["input_points"] += len(points)
+        t_total_0 = time.perf_counter()
 
         # Step 1: Speed-based Representation
         # Convert raw points to [(road_id, direction, offset, speed), ...]
+        t0 = time.perf_counter()
         speed_rep = self._speed_based_representation(points)
+        t1 = time.perf_counter()
+        self.diagnostics["speed_rep_time_s"] += float(t1 - t0)
+        self.diagnostics["speed_rep_points"] += len(speed_rep)
+        if len(points) > 0:
+            self.diagnostics["speed_rep_reduction_ratio"] = float(len(speed_rep) / len(points))
 
         # Step 2: Referential Compression
         # Replace subsequences with references to existing trajectories
+        t0 = time.perf_counter()
         compressed_rep = self._referential_compression(speed_rep)
+        t1 = time.perf_counter()
+        self.diagnostics["referential_time_s"] += float(t1 - t0)
 
         # Step 3: Reference Management (Selection, Deletion, Rewriting)
         # Updates the reference set based on usage
@@ -92,7 +125,30 @@ class TraceCompressor:
                     # Item is (ref_id, start, len, mismatch)
                     used_refs.add(item[0])
 
+        t0 = time.perf_counter()
         self._manage_references(points, speed_rep, used_refs, current_time)
+        t1 = time.perf_counter()
+        self.diagnostics["reference_manage_time_s"] += float(t1 - t0)
+
+        self.diagnostics["factor_count_e"] = len(compressed_rep.get("E", []))
+        self.diagnostics["factor_count_v"] = len(compressed_rep.get("V", []))
+        self.diagnostics["tuple_match_factors_e"] = sum(
+            1 for item in compressed_rep.get("E", []) if isinstance(item, tuple)
+        )
+        self.diagnostics["tuple_match_factors_v"] = sum(
+            1 for item in compressed_rep.get("V", []) if isinstance(item, tuple)
+        )
+        self.diagnostics["literal_factors_e"] = (
+            self.diagnostics["factor_count_e"] - self.diagnostics["tuple_match_factors_e"]
+        )
+        self.diagnostics["literal_factors_v"] = (
+            self.diagnostics["factor_count_v"] - self.diagnostics["tuple_match_factors_v"]
+        )
+        self.diagnostics["references_count"] = len(self.references)
+        self.diagnostics["kmer_bucket_count"] = len(self.kmer_index)
+        self.diagnostics["kmer_entry_count"] = sum(len(v) for v in self.kmer_index.values())
+        t_total_1 = time.perf_counter()
+        self.diagnostics["compress_total_time_s"] += float(t_total_1 - t_total_0)
 
         return compressed_rep
 
@@ -353,7 +409,9 @@ class TraceCompressor:
         
         Removes references that haven't been used recently to save space.
         """
+        t0 = time.perf_counter()
         if not self.references:
+            self.diagnostics["reference_delete_time_s"] += 0.0
             return
 
         decay_lambda = self.config.decay_lambda
@@ -399,6 +457,8 @@ class TraceCompressor:
         # Perform deletion
         for ref_id in refs_to_delete:
             self._delete_reference(ref_id)
+        t1 = time.perf_counter()
+        self.diagnostics["reference_delete_time_s"] += float(t1 - t0)
 
     def _delete_reference(self, ref_id: int):
         """Helper to remove a reference and clear its index entries."""
@@ -454,3 +514,6 @@ class TraceCompressor:
                 kmer_hash = hash(('V', kmer))
                 entry = (ref.ref_id, i, 'V')
                 self.kmer_index[kmer_hash].append(entry)
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        return dict(self.diagnostics)

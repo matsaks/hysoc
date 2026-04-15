@@ -31,6 +31,7 @@ from hysoc.modules.move_compression.squish import SquishCompressor
 from hysoc.modules.segmentation.step import STEPSegmenter
 from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
 from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 
 DEFAULT_OUTPUT_ROOT = os.path.join(
@@ -705,6 +706,36 @@ def main() -> None:
     with open(summary_path, "w", newline="") as f:
         json.dump(summary, f, indent=2)
     print(f"Saved summary: {summary_path}")
+
+    contract_per_file: List[Dict[str, Any]] = []
+    for obj_id, rec in per_object.items():
+        pipelines = {vk: normalize_pipeline_metrics(rec["variants"][vk]) for vk in variant_keys}
+        contract_per_file.append(
+            {
+                "obj_id": obj_id,
+                "n_raw_points": int(rec["n_raw_points"]),
+                "pipelines": pipelines,
+            }
+        )
+
+    contract_paths = write_contract_bundle(
+        out_dir,
+        script_name="demo_16_step_vs_stss_hybrid_ablation",
+        run_config={
+            "buffer_capacity": args.buffer_capacity,
+            "dp_epsilon_meters": args.dp_epsilon_meters,
+            "max_files": args.max_files,
+            "subset_dir": subset_dir,
+            "n_input_files": len(csv_files),
+            "n_processed_files": len(per_object),
+            "latency_note": "Per-variant latency is not measured in this demo and is exported as null.",
+        },
+        per_file_records=contract_per_file,
+        metadata={
+            "variant_families": family_to_variants,
+        },
+    )
+    print(f"Saved contract bundle: {contract_paths['contract_agg_summary']}")
 
     # Comparison plot grouped by family
     try:

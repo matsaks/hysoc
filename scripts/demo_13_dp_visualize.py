@@ -22,8 +22,8 @@ from hysoc.modules.move_compression.dp import DouglasPeuckerCompressor
 
 
 # Defaults (used by this demo; change here for a different trajectory/epsilon).
-DEFAULT_SUBSET = "subset_50"
-DEFAULT_OBJ_ID = "6350025"
+DEFAULT_SUBSET = "London_Final_100"
+DEFAULT_OBJ_ID = "5564434"
 DEFAULT_EPSILON_METERS = DP_DEFAULT_EPSILON_METERS
 
 

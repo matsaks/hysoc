@@ -15,6 +15,7 @@ Run directly:
 import os
 import sys
 import math
+import time
 from typing import List, Optional
 
 from hysoc.core.point import Point
@@ -85,6 +86,19 @@ class HYSOCCompressor:
         # Metrics
         self._total_points_in = 0
         self._total_points_compressed = 0
+        self.diagnostics = {
+            "map_matching_time_s": 0.0,
+            "segmentation_time_s": 0.0,
+            "compression_time_s": 0.0,
+            "trace_time_s": 0.0,
+            "trace_retained_extract_time_s": 0.0,
+            "retention_input_points": 0,
+            "retention_kept_points": 0,
+            "retention_kept_road_change": 0,
+            "retention_kept_speed_change": 0,
+            "retention_forced_last_point": 0,
+            "retention_move_segments": 0,
+        }
 
     # ------------------------------------------------------------------
     # Streaming interface
@@ -99,20 +113,29 @@ class HYSOCCompressor:
 
         # Stage 1: Map Matching
         if self.map_matcher is not None:
+            t0 = time.perf_counter()
             matched_point = self.map_matcher.process_point(point)
+            t1 = time.perf_counter()
+            self.diagnostics["map_matching_time_s"] += float(t1 - t0)
             if matched_point is None:
                 return []
             point = matched_point
 
         # Stage 2: Segmentation
+        t0 = time.perf_counter()
         segments = self.segmenter.process_point(point)
+        t1 = time.perf_counter()
+        self.diagnostics["segmentation_time_s"] += float(t1 - t0)
 
         # Stage 3: Compression
         compressed = []
+        t0 = time.perf_counter()
         for seg in segments:
             c_seg = self._compress_segment(seg)
             if c_seg is not None:
                 compressed.append(c_seg)
+        t1 = time.perf_counter()
+        self.diagnostics["compression_time_s"] += float(t1 - t0)
 
         return compressed
 
@@ -123,17 +146,26 @@ class HYSOCCompressor:
         # Flush map matcher buffers through segmenter
         if self.map_matcher is not None:
             for point in self.map_matcher.flush():
+                t0 = time.perf_counter()
                 segments = self.segmenter.process_point(point)
+                t1 = time.perf_counter()
+                self.diagnostics["segmentation_time_s"] += float(t1 - t0)
+                t0 = time.perf_counter()
                 for seg in segments:
                     c_seg = self._compress_segment(seg)
                     if c_seg is not None:
                         compressed.append(c_seg)
+                t1 = time.perf_counter()
+                self.diagnostics["compression_time_s"] += float(t1 - t0)
 
         # Flush segmenter
+        t0 = time.perf_counter()
         for seg in self.segmenter.flush():
             c_seg = self._compress_segment(seg)
             if c_seg is not None:
                 compressed.append(c_seg)
+        t1 = time.perf_counter()
+        self.diagnostics["compression_time_s"] += float(t1 - t0)
 
         return compressed
 
@@ -200,8 +232,20 @@ class HYSOCCompressor:
                 compressed_data = self.dp_compressor.compress(squish_result)
                 total_compressed = len(compressed_data)
             else:
+                t0 = time.perf_counter()
                 trace_result = self.move_compressor.compress(seg.points)
-                retained_points = self._extract_retained_points_from_trace(seg.points)
+                t1 = time.perf_counter()
+                self.diagnostics["trace_time_s"] += float(t1 - t0)
+                t0 = time.perf_counter()
+                retained_points, counters = self._extract_retained_points_from_trace(seg.points)
+                t1 = time.perf_counter()
+                self.diagnostics["trace_retained_extract_time_s"] += float(t1 - t0)
+                self.diagnostics["retention_move_segments"] += 1
+                self.diagnostics["retention_input_points"] += counters["input_points"]
+                self.diagnostics["retention_kept_points"] += counters["kept_points"]
+                self.diagnostics["retention_kept_road_change"] += counters["road_change_kept"]
+                self.diagnostics["retention_kept_speed_change"] += counters["speed_change_kept"]
+                self.diagnostics["retention_forced_last_point"] += counters["forced_last_point"]
                 compressed_data = {
                     "trace_result": trace_result,
                     "retained_points": retained_points,
@@ -224,13 +268,24 @@ class HYSOCCompressor:
 
         return None
 
-    def _extract_retained_points_from_trace(self, points: List[Point]) -> List[Point]:
+    def _extract_retained_points_from_trace(self, points: List[Point]) -> tuple[List[Point], dict]:
         """Identifies retained velocity-change points for TRACE rendering."""
         if not points or len(points) < 2:
-            return points
+            n = len(points) if points else 0
+            counters = {
+                "input_points": n,
+                "kept_points": n,
+                "road_change_kept": n,
+                "speed_change_kept": 0,
+                "forced_last_point": 0,
+            }
+            return points, counters
 
         retained_points = []
         gamma = self.config.trace_config.gamma
+        road_change_kept = 0
+        speed_change_kept = 0
+        forced_last_point = 0
 
         def lat_lon_dist(p1: Point, p2: Point) -> float:
             lat1 = math.radians(p1.lat)
@@ -248,6 +303,7 @@ class HYSOCCompressor:
             if i == 0 or p.road_id != current_road_id:
                 current_road_id = p.road_id
                 retained_points.append(p)
+                road_change_kept += 1
                 last_stored_speed = 0.0
                 continue
 
@@ -262,12 +318,38 @@ class HYSOCCompressor:
 
             if abs(current_speed - last_stored_speed) > gamma:
                 retained_points.append(p)
+                speed_change_kept += 1
                 last_stored_speed = current_speed
 
         if retained_points and retained_points[-1] != points[-1]:
             retained_points.append(points[-1])
+            forced_last_point = 1
 
-        return retained_points
+        counters = {
+            "input_points": len(points),
+            "kept_points": len(retained_points),
+            "road_change_kept": road_change_kept,
+            "speed_change_kept": speed_change_kept,
+            "forced_last_point": forced_last_point,
+        }
+        return retained_points, counters
+
+    def get_diagnostics(self) -> dict:
+        diag = dict(self.diagnostics)
+        if self.map_matcher is not None and hasattr(self.map_matcher, "get_diagnostics"):
+            diag["map_matcher"] = self.map_matcher.get_diagnostics()
+        if (
+            self.config.move_compression_strategy == CompressionStrategy.NETWORK_SEMANTIC
+            and hasattr(self.move_compressor, "get_diagnostics")
+        ):
+            diag["trace"] = self.move_compressor.get_diagnostics()
+        if diag["retention_input_points"] > 0:
+            diag["retention_ratio"] = float(
+                diag["retention_kept_points"] / diag["retention_input_points"]
+            )
+        else:
+            diag["retention_ratio"] = 0.0
+        return diag
 
     def get_compression_summary(self) -> str:
         """Returns a human-readable summary of the current configuration."""

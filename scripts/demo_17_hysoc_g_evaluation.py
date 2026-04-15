@@ -33,6 +33,7 @@ from hysoc.modules.move_compression.squish import SquishCompressor
 from hysoc.modules.segmentation.step import STEPSegmenter
 from hysoc.modules.stop_compression.compressor import CompressedStop, StopCompressor
 from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
+from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_17_hysoc_g_evaluation")
 DEFAULT_BUFFER_CAPACITY = SQUISH_DEFAULT_CAPACITY
@@ -182,6 +183,7 @@ def main() -> None:
     )
 
     results = []
+    contract_per_file: List[Dict[str, Any]] = []
 
     for fname in csv_files:
         obj_id = os.path.splitext(fname)[0]
@@ -236,6 +238,16 @@ def main() -> None:
             **{f"hysoc_{k}": v for k, v in metrics_hysoc.items()}
         }
         results.append(rec)
+        contract_per_file.append(
+            {
+                "obj_id": obj_id,
+                "n_raw_points": n_raw,
+                "pipelines": {
+                    "oracle_g": normalize_pipeline_metrics(metrics_oracle),
+                    "hysoc_g": normalize_pipeline_metrics(metrics_hysoc),
+                },
+            }
+        )
         
         # --- PER-FILE OUTPUTS ---
         obj_dir = os.path.join(out_dir, obj_id)
@@ -264,6 +276,23 @@ def main() -> None:
             writer.writeheader()
             writer.writerows(results)
         print(f"Saved evaluation aggregate metrics: {csv_path}")
+
+    contract_paths = write_contract_bundle(
+        out_dir,
+        script_name="demo_17_hysoc_g_evaluation",
+        run_config={
+            "buffer_capacity": args.buffer_capacity,
+            "dp_epsilon_meters": args.dp_epsilon_meters,
+            "subset_dir": subset_dir,
+            "n_input_files": len(csv_files),
+            "n_processed_files": len(results),
+        },
+        per_file_records=contract_per_file,
+        metadata={
+            "notes": "Contract metrics normalized from existing demo outputs.",
+        },
+    )
+    print(f"Saved contract bundle: {contract_paths['contract_agg_summary']}")
 
     # Summary Plotting
     if not results:

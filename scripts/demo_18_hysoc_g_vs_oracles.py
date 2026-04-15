@@ -37,7 +37,7 @@ from benchmarks.oracles.stss_sklearn import STSSOracleSklearn
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_18_hysoc_g_vs_oracles")
 DEFAULT_BUFFER_CAPACITY = SQUISH_DEFAULT_CAPACITY
 DEFAULT_DP_EPSILON_METERS = DP_DEFAULT_EPSILON_METERS
-DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "subset_50")
+DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "London_Final_100")
 
 def load_trajectory(filepath: str, obj_id: str) -> List[Point]:
     points: List[Point] = []

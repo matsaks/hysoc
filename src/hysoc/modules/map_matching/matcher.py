@@ -2,6 +2,7 @@ from collections import deque
 from typing import List, Optional
 import networkx as nx
 import copy
+import time
 
 import dataclasses
 from hysoc.core.point import Point
@@ -53,6 +54,16 @@ class OnlineMapMatcher:
         # Initialize InMemMap for LeuvenMapMatching
         self.map_con = InMemMap("network", use_latlon=True)
         self._build_map()
+        self.diagnostics = {
+            "points_in": 0,
+            "window_wait_count": 0,
+            "match_window_calls": 0,
+            "matcher_build_time_s": 0.0,
+            "viterbi_match_time_s": 0.0,
+            "edge_snap_time_s": 0.0,
+            "flush_matches": 0,
+            "failed_matches": 0,
+        }
 
     def _build_map(self):
         """Converts the OSMnx graph to LeuvenMapMatching's internal representation."""
@@ -79,9 +90,11 @@ class OnlineMapMatcher:
             is not yet full.
         """
         self.buffer.append(point)
+        self.diagnostics["points_in"] += 1
         
         # Wait until we have enough context
         if len(self.buffer) < self.window_size:
+            self.diagnostics["window_wait_count"] += 1
             return None
             
         # Buffer is full, run matching on the whole window
@@ -101,9 +114,11 @@ class OnlineMapMatcher:
             matched_point = self._match_window()
             if matched_point:
                 flushed_points.append(matched_point)
+                self.diagnostics["flush_matches"] += 1
             else:
                 # If matching completely fails, just yield the raw point
                 flushed_points.append(self.buffer[0])
+                self.diagnostics["failed_matches"] += 1
             self.buffer.popleft()
             
         return flushed_points
@@ -114,6 +129,7 @@ class OnlineMapMatcher:
         """
         if not self.buffer:
             return None
+        self.diagnostics["match_window_calls"] += 1
             
         # Create a deep copy of the oldest point so we don't mutate the original
         # immediately if it's referenced elsewhere.
@@ -122,17 +138,24 @@ class OnlineMapMatcher:
         # Extract lat/lon path. We pass (lat, lon) to matcher.
         path = [(p.lat, p.lon) for p in self.buffer]
         
+        t_build_0 = time.perf_counter()
         matcher = DistanceMatcher(
             self.map_con, 
             max_dist=self.max_dist, 
             max_dist_init=self.max_dist_init, 
             min_prob_norm=self.min_prob_norm
         )
+        t_build_1 = time.perf_counter()
+        self.diagnostics["matcher_build_time_s"] += float(t_build_1 - t_build_0)
         
+        t_match_0 = time.perf_counter()
         try:
             states, _ = matcher.match(path)
         except Exception:
             states = []
+            self.diagnostics["failed_matches"] += 1
+        t_match_1 = time.perf_counter()
+        self.diagnostics["viterbi_match_time_s"] += float(t_match_1 - t_match_0)
             
         # states is a list of node tuples representing edges: [(u, v), (v, w), ...]
         # Note: LMM sometimes returns fewer states than input points if it drops noisy points,
@@ -157,6 +180,7 @@ class OnlineMapMatcher:
                 print(f"DEBUG: get_edge_data({u}, {v}) returned None!")
             
             # Snap point to geometry
+            t_snap_0 = time.perf_counter()
             snapped_lat, snapped_lon = oldest_point.lat, oldest_point.lon # default
             if edge_data and 0 in edge_data:
                 from shapely.geometry import Point as ShapelyPoint, LineString
@@ -172,6 +196,8 @@ class OnlineMapMatcher:
                 proj_dist = geom.project(raw_pt)
                 snapped_pt = geom.interpolate(proj_dist)
                 snapped_lon, snapped_lat = snapped_pt.x, snapped_pt.y
+            t_snap_1 = time.perf_counter()
+            self.diagnostics["edge_snap_time_s"] += float(t_snap_1 - t_snap_0)
 
             # Use dataclasses.replace to bypass frozen instance restrictions
             oldest_point = dataclasses.replace(
@@ -182,3 +208,6 @@ class OnlineMapMatcher:
             )
                 
         return oldest_point
+
+    def get_diagnostics(self) -> dict:
+        return dict(self.diagnostics)
