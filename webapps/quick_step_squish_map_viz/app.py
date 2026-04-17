@@ -59,7 +59,7 @@ from engines.step import STEPSegmenter  # noqa: E402
 from oracle.oracleG import OracleG  # noqa: E402
 
 
-DATA_DIR = REPO_ROOT / "data" / "raw" / "NYC_100"
+DATA_DIR = REPO_ROOT / "data" / "raw" / "NYC_Top_100_Most_Points"
 MAX_PLOTTED_POINTS = 1500
 FILENAME_RE = re.compile(r"^[0-9]+$")
 
