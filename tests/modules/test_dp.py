@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from core.point import Point
-from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.dp import DouglasPeuckerCompressor
 
 def create_straight_line(n_points: int, start_lat: float, start_lon: float, lat_step: float, lon_step: float) -> list[Point]:
     base_time = datetime(2026, 1, 1, 12, 0, 0)

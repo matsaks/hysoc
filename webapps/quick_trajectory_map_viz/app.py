@@ -2,7 +2,7 @@
 Quick trajectory map visualization (raw GPS only).
 
 This app intentionally does *not* run HMM map-matching and does *not* save plots to disk.
-It loads `data/raw/subset_50/<filename>.csv`, plots the trajectory on top of a basemap,
+It loads `data/raw/NYC_100/<filename>.csv`, plots the trajectory on top of a basemap,
 and renders the result directly in Streamlit from an in-memory PNG.
 """
 
@@ -37,8 +37,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-DATA_DIR = _repo_root() / "data" / "raw" / "subset_50"
-POINT_COUNTS_PATH = _repo_root() / "data" / "raw" / "subset_50_point_counts.txt"
+DATA_DIR = _repo_root() / "data" / "raw" / "NYC_100"
 
 MAX_PLOTTED_POINTS = 1500
 
@@ -63,28 +62,6 @@ def _list_available_ids() -> list[str]:
     if not DATA_DIR.exists():
         return []
     return sorted(p.stem for p in DATA_DIR.glob("*.csv"))
-
-
-@st.cache_data(show_spinner=False)
-def _load_ids_from_point_counts() -> list[str]:
-    """
-    Loads available trajectory IDs from:
-    `data/raw/subset_50_point_counts.txt` (format: `<file>.csv: <count>`).
-    """
-    if not POINT_COUNTS_PATH.exists():
-        return _list_available_ids()
-
-    ids: list[str] = []
-    for line in POINT_COUNTS_PATH.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        # Example: `4494499.csv: 616`
-        m = re.match(r"^([0-9]+)\.csv:\s*\d+\s*$", line)
-        if m:
-            ids.append(m.group(1))
-    ids = sorted(set(ids))
-    return ids
 
 
 @st.cache_data(show_spinner=False)
@@ -149,7 +126,7 @@ def _render_map_png(df: pd.DataFrame, filename_id: str) -> BytesIO:
     # Add web tiles basemap (internet required).
     ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
     ax.set_axis_off()
-    ax.set_title(f"Raw trajectory (subset_50/{filename_id}.csv)")
+    ax.set_title(f"Raw trajectory (NYC_100/{filename_id}.csv)")
 
     buf = BytesIO()
     fig.savefig(buf, format="png", dpi=180, bbox_inches="tight")
@@ -163,9 +140,9 @@ def main() -> None:
     st.title("HYSOC Quick Trajectory Map Viz")
     st.caption("Raw GPS plotting only. No plot files saved.")
 
-    default_id = "5013812"
+    default_id = "4344893"
 
-    ids = _load_ids_from_point_counts()
+    ids = _list_available_ids()
     if not ids:
         ids = [default_id]
 
@@ -213,7 +190,7 @@ def main() -> None:
             # Render via HTML to guarantee centering while keeping a large size.
             png_bytes = png_buf.getvalue()
             b64 = base64.b64encode(png_bytes).decode("utf-8")
-            caption = f"subset_50/{filename_id}.csv"
+            caption = f"NYC_100/{filename_id}.csv"
             plot_placeholder.markdown(
                 f"""
                 <div style="display:flex; justify-content:center;">

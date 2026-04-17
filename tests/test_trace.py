@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
 import math
-from engines.move_compression.trace import TraceCompressor, TraceConfig
+from engines.trace import TraceCompressor, TraceConfig
 from core.point import Point
 
 class TestTraceCompressor(unittest.TestCase):

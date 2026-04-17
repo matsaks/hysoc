@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime
 from core.point import Point
 from core.segment import Move
-from oracle.oracleN import STCOracle
+from oracle.oracleN import OracleN
 
 
 def test_stc_oracle_length():
@@ -14,7 +14,7 @@ def test_stc_oracle_length():
         Point(lat=0.4, lon=0.4, timestamp=datetime(2025, 1, 1, 0, 0, 40), obj_id="1", road_id="C"),
     ]
     move = Move(points=points)
-    oracle = STCOracle()
+    oracle = OracleN()
     compressed = oracle.process(move)
     
     assert len(compressed) == 3
@@ -30,7 +30,7 @@ def test_stc_oracle_last_is_not_new():
         Point(lat=0.3, lon=0.3, timestamp=datetime(2025, 1, 1, 0, 0, 30), obj_id="1", road_id="B"),
     ]
     move = Move(points=points)
-    oracle = STCOracle()
+    oracle = OracleN()
     compressed = oracle.process(move)
     
     # idx 0: compressed=[0], current=A
@@ -45,7 +45,7 @@ def test_stc_oracle_last_is_not_new():
 def test_stc_oracle_single_point():
     points = [Point(lat=0.0, lon=0.0, timestamp=datetime(2025, 1, 1, 0, 0, 0), obj_id="1", road_id="A")]
     move = Move(points=points)
-    oracle = STCOracle()
+    oracle = OracleN()
     compressed = oracle.process(move)
     assert len(compressed) == 1
 

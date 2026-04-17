@@ -18,7 +18,7 @@ sys.path.append(os.path.join(project_root, "src"))
 
 from core.point import Point
 from eval import calculate_sed_stats
-from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.dp import DouglasPeuckerCompressor
 
 
 def load_trajectory(filepath: str, obj_id: str) -> List[Point]:

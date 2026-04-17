@@ -10,7 +10,7 @@ sys.path.append(str(project_root / "src"))
 
 from core.point import Point
 from core.segment import Stop, Move
-from oracle.oracleG import STSSOracleSklearn
+from oracle.oracleG import OracleG
 
 def load_trajectory(filepath):
     df = pd.read_csv(filepath)
@@ -62,7 +62,7 @@ def tune_parameters(filepath):
     for min_samples in min_samples_list:
         for max_eps in max_eps_list:
             for min_duration in min_duration_list:
-                oracle = STSSOracleSklearn(
+                oracle = OracleG(
                     min_samples=min_samples, 
                     max_eps=max_eps, 
                     min_duration_seconds=min_duration

@@ -3,7 +3,7 @@ from typing import List
 from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
 from core.point import Point
 from core.segment import Segment
-from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.dp import DouglasPeuckerCompressor
 
 
 class OracleDP:

@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
 from core.point import Point
-from engines.move_compression.squish import SquishCompressor
+from engines.squish import SquishCompressor
 
 class TestSquishCompressor(unittest.TestCase):
     def setUp(self):

@@ -19,11 +19,11 @@ from constants.segmentation_defaults import (
 
 from core.stream import TrajectoryStream
 from core.segment import Stop, Move
-from engines.segmentation.step import STEPSegmenter
-from engines.stop_compression.compressor import StopCompressor
-from engines.move_compression.trace import TraceCompressor, TraceConfig
-from engines.map_matching.matcher import OnlineMapMatcher
-from engines.map_matching.wrapper import MapMatchedStreamWrapper
+from engines.step import STEPSegmenter
+from engines.stop_compressor import StopCompressor
+from engines.trace import TraceCompressor, TraceConfig
+from engines.hmm import OnlineMapMatcher
+from engines.map_matched_stream import MapMatchedStreamWrapper
 
 class HYSOCVisualizer:
     def __init__(

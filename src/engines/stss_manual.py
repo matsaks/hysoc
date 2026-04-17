@@ -1,12 +1,10 @@
-from typing import List, Set
+from typing import List
 from math import radians, sin, cos, sqrt, atan2
 
 from core.point import Point
 from core.segment import Segment, Stop, Move
 from constants.geo_defaults import EARTH_RADIUS_M
 from constants.segmentation_defaults import (
-    STOP_MAX_EPS_METERS,
-    STOP_MIN_DURATION_SECONDS,
     STSS_MIN_SAMPLES,
     STSS_MAX_EPS_METERS,
     STSS_MIN_DURATION_SECONDS,

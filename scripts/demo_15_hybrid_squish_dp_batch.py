@@ -27,14 +27,14 @@ from constants.segmentation_defaults import (
 from core.point import Point
 from core.segment import Move, Stop
 from eval import calculate_sed_stats
-from engines.move_compression.hybrid_squish_dp import (
+from engines.squish_dp import (
     HybridSquishDPCompressor,
     HybridSquishDPConfig,
 )
-from engines.move_compression.squish import SquishCompressor
-from engines.stop_compression.compressor import CompressedStop, StopCompressor
-from oracle.dpOracle import DPOracle
-from oracle.oracleG import STSSOracleSklearn
+from engines.squish import SquishCompressor
+from engines.stop_compressor import CompressedStop, StopCompressor
+from oracle.oracleDP import OracleDP
+from oracle.oracleG import OracleG
 
 
 DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "subset_50")
@@ -104,11 +104,11 @@ def run_one_trajectory(
     *,
     buffer_capacity: int,
     dp_epsilon_meters: float,
-    stss_oracle: STSSOracleSklearn,
+    stss_oracle: OracleG,
     stop_compressor: StopCompressor,
     squish: SquishCompressor,
     hybrid: HybridSquishDPCompressor,
-    dp_oracle: DPOracle,
+    dp_oracle: OracleDP,
 ) -> Dict[str, object]:
     segments = stss_oracle.process(trajectory)
 
@@ -242,7 +242,7 @@ def main() -> None:
 
     print(f"Processing {len(csv_files)} trajectories in {subset_dir}")
 
-    stss_oracle = STSSOracleSklearn(
+    stss_oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,
@@ -256,7 +256,7 @@ def main() -> None:
             dp_refine_when_evictions=args.dp_refine_when_evictions,
         )
     )
-    dp_oracle = DPOracle(epsilon_meters=args.dp_epsilon_meters)
+    dp_oracle = OracleDP(epsilon_meters=args.dp_epsilon_meters)
 
     per_obj: Dict[str, Dict[str, object]] = {}
 

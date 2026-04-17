@@ -1,5 +1,5 @@
-from .dpOracle import DPOracle
-from .oracleG import STSSOracleSklearn, STSSOracleManual
-from .oracleN import STCOracle
+from .oracleDP import OracleDP
+from .oracleG import OracleG
+from .oracleN import OracleN
 
-__all__ = ["DPOracle", "STSSOracleSklearn", "STSSOracleManual", "STCOracle"]
+__all__ = ["OracleDP", "OracleG", "OracleN"]

@@ -25,12 +25,12 @@ from core.compression import (
     CompressedSegment,
     CompressedTrajectory,
 )
-from engines.segmentation.step import STEPSegmenter
-from engines.stop_compression.compressor import StopCompressor
-from engines.move_compression.squish import SquishCompressor
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.trace import TraceCompressor
-from engines.map_matching.matcher import OnlineMapMatcher
+from engines.step import STEPSegmenter
+from engines.stop_compressor import StopCompressor
+from engines.squish import SquishCompressor
+from engines.dp import DouglasPeuckerCompressor
+from engines.trace import TraceCompressor
+from engines.hmm import OnlineMapMatcher
 from constants.geo_defaults import EARTH_RADIUS_M
 
 # ---------------------------------------------------------------------------

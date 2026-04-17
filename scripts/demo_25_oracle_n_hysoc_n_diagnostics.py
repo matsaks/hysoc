@@ -26,8 +26,8 @@ project_root = os.path.join(current_dir, "..")
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
-from oracle.oracleN import STCOracle
-from oracle.oracleG import STSSOracleSklearn
+from oracle.oracleN import OracleN
+from oracle.oracleG import OracleG
 from constants.segmentation_defaults import (
     STSS_MIN_SAMPLES,
     STOP_MAX_EPS_METERS,
@@ -37,7 +37,7 @@ from core.compression import CompressionStrategy, HYSOCConfig
 from core.point import Point
 from core.segment import Move, Stop
 from eval.sed import calculate_sed_error, calculate_sed_stats
-from engines.stop_compression.compressor import CompressedStop, StopCompressor
+from engines.stop_compressor import CompressedStop, StopCompressor
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_25_oracle_n_hysoc_n_diagnostics")
 DEFAULT_INPUT_DIR = os.path.join("data", "raw", "London_Final_100")
@@ -121,7 +121,7 @@ def reconstruct_for_sed(items: List[object]) -> Tuple[List[Point], int]:
 
 
 def map_match_points_with_diag(raw_points: List[Point], graph) -> Tuple[List[Point], Dict[str, Any]]:
-    from engines.map_matching.matcher import OnlineMapMatcher
+    from engines.hmm import OnlineMapMatcher
 
     matcher = OnlineMapMatcher(graph)
     matched: List[Point] = []
@@ -415,12 +415,12 @@ def main() -> None:
     print(f"Output: {out_dir}")
 
     stop_compressor = StopCompressor()
-    stss_oracle = STSSOracleSklearn(
+    stss_oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,
     )
-    stc_oracle = STCOracle()
+    stc_oracle = OracleN()
 
     # Oracle-N with stage timings and map-matcher diagnostics.
     oracle_stages_s = {"stss_s": 0.0, "map_matching_s": 0.0, "stc_s": 0.0}

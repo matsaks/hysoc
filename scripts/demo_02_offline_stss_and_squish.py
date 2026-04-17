@@ -20,9 +20,9 @@ from constants.segmentation_defaults import (
 
 from core.point import Point
 from core.segment import Segment, Stop, Move
-from oracle.oracleG import STSSOracleSklearn
-from engines.stop_compression.compressor import StopCompressor, CompressedStop
-from engines.move_compression.squish import SquishCompressor
+from oracle.oracleG import OracleG
+from engines.stop_compressor import StopCompressor, CompressedStop
+from engines.squish import SquishCompressor
 from eval import calculate_compression_ratio, calculate_sed_stats
 
 def load_trajectory(filepath: str) -> List[Point]:
@@ -64,8 +64,8 @@ def main():
         return
 
     # 2. Segment
-    print("Running STSSOracleSklearn...")
-    oracle = STSSOracleSklearn(
+    print("Running OracleG...")
+    oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,

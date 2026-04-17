@@ -18,7 +18,7 @@ sys.path.append(os.path.join(project_root, "src"))
 from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
 from core.point import Point
 from eval import calculate_sed_stats, calculate_compression_ratio
-from engines.move_compression.dp import DouglasPeuckerCompressor
+from engines.dp import DouglasPeuckerCompressor
 
 
 # Defaults (used by this demo; change here for a different trajectory/epsilon).

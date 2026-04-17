@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 from core.point import Point
-from engines.stop_compression.compressor import StopCompressor
+from engines.stop_compressor import StopCompressor
 
 class TestStopCompression(unittest.TestCase):
     def test_compress_centroid_and_structure(self):

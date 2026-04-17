@@ -24,8 +24,8 @@ from constants.segmentation_defaults import (
 
 from core.point import Point
 from core.segment import Segment, Stop, Move
-from oracle.oracleG import STSSOracleSklearn
-from engines.stop_compression.compressor import StopCompressor, CompressedStop
+from oracle.oracleG import OracleG
+from engines.stop_compressor import StopCompressor, CompressedStop
 
 def load_trajectory(filepath: str) -> List[Point]:
     """
@@ -66,8 +66,8 @@ def main():
         return
 
     # 2. Segment (Status: Segments with full point lists)
-    print("Running STSSOracleSklearn...")
-    oracle = STSSOracleSklearn(
+    print("Running OracleG...")
+    oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,

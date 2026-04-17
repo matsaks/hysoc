@@ -44,11 +44,11 @@ from core.compression import CompressionStrategy, HYSOCConfig
 from core.point import Point
 from core.segment import Move, Stop
 from eval import calculate_sed_stats
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.squish import SquishCompressor
-from engines.stop_compression.compressor import CompressedStop, StopCompressor
-from oracle.oracleN import STCOracle
-from oracle.oracleG import STSSOracleSklearn
+from engines.dp import DouglasPeuckerCompressor
+from engines.squish import SquishCompressor
+from engines.stop_compressor import CompressedStop, StopCompressor
+from oracle.oracleN import OracleN
+from oracle.oracleG import OracleG
 from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_23_hysoc_vs_oracles_cached_graph")
@@ -189,7 +189,7 @@ def compute_hysoc_metrics(original: List[Point], compressed_trajectory, latency_
 
 
 def map_match_points(raw_points: List[Point], graph) -> List[Point]:
-    from engines.map_matching.matcher import OnlineMapMatcher
+    from engines.hmm import OnlineMapMatcher
 
     matcher = OnlineMapMatcher(graph)
     matched: List[Point] = []
@@ -414,12 +414,12 @@ def main() -> None:
     stop_compressor = StopCompressor()
     squish = SquishCompressor(capacity=args.buffer_capacity)
     dp_compressor = DouglasPeuckerCompressor(epsilon_meters=args.dp_epsilon_meters)
-    stss_oracle = STSSOracleSklearn(
+    stss_oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,
     )
-    stc_oracle = STCOracle()
+    stc_oracle = OracleN()
 
     results: List[Dict[str, Any]] = []
     contract_per_file: List[Dict[str, Any]] = []

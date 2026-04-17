@@ -6,8 +6,8 @@ from typing import List, Optional
 from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
 from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
 from core.point import Point
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.squish import SquishCompressor
+from engines.dp import DouglasPeuckerCompressor
+from engines.squish import SquishCompressor
 
 
 @dataclass(frozen=True)

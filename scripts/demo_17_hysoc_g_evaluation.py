@@ -28,11 +28,11 @@ from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
 from core.point import Point
 from core.segment import Move, Stop
 from eval import calculate_sed_stats
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.squish import SquishCompressor
-from engines.segmentation.step import STEPSegmenter
-from engines.stop_compression.compressor import CompressedStop, StopCompressor
-from oracle.oracleG import STSSOracleSklearn
+from engines.dp import DouglasPeuckerCompressor
+from engines.squish import SquishCompressor
+from engines.step import STEPSegmenter
+from engines.stop_compressor import CompressedStop, StopCompressor
+from oracle.oracleG import OracleG
 from evaluation_contract import normalize_pipeline_metrics, write_contract_bundle
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_17_hysoc_g_evaluation")
@@ -176,7 +176,7 @@ def main() -> None:
     stop_compressor = StopCompressor()
     squish = SquishCompressor(capacity=args.buffer_capacity)
     dp_compressor = DouglasPeuckerCompressor(epsilon_meters=args.dp_epsilon_meters)
-    stss_oracle = STSSOracleSklearn(
+    stss_oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,

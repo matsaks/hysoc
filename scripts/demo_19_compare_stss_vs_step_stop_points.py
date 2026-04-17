@@ -25,11 +25,11 @@ from constants.segmentation_defaults import (
 )
 from core.point import Point
 from core.segment import Move, Stop
-from engines.segmentation.step import STEPSegmenter
-from oracle.oracleG import STSSOracleSklearn
+from engines.step import STEPSegmenter
+from oracle.oracleG import OracleG
 
 DEFAULT_OUTPUT_ROOT = os.path.join("data", "processed", "demo_19_compare_stss_vs_step")
-DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "subset_50")
+DEFAULT_SUBSET_DIR = os.path.join("data", "raw", "NYC_100")
 
 def load_trajectory(filepath: str, obj_id: str) -> List[Point]:
     points: List[Point] = []
@@ -134,13 +134,14 @@ def main() -> None:
 
     print(f"Running STSS vs STEP Evaluation on {len(csv_files)} trajectories in {subset_dir} ...")
 
-    stss_oracle = STSSOracleSklearn(
+    stss_oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STSS_MAX_EPS_METERS,
         min_duration_seconds=STSS_MIN_DURATION_SECONDS,
     )
 
     results = []
+    skipped_count = 0
 
     for idx, fname in enumerate(csv_files):
         obj_id = os.path.splitext(fname)[0]
@@ -152,6 +153,7 @@ def main() -> None:
 
         if n_raw < 2:
             print(" Skipped (too few points).")
+            skipped_count += 1
             continue
             
         # 1. Pipeline: STSS Oracle Offline
@@ -217,7 +219,15 @@ def main() -> None:
         print(f"\nSaved evaluation aggregate metrics: {csv_path}")
 
         # Summary mapping (sums and means)
-        agg_metrics = {"total": {}, "mean": {}}
+        agg_metrics = {
+            "meta": {
+                "n_input_files": int(len(csv_files)),
+                "n_processed_files": int(len(results)),
+                "n_skipped_files": int(skipped_count),
+            },
+            "total": {},
+            "mean": {},
+        }
         keys_to_sum = [
             "n_raw_points", 
             "stss_num_stop_segments", "stss_num_stop_points", "stss_latency_ms",
@@ -245,14 +255,18 @@ def main() -> None:
             
             # Stops bar chart
             ax[0].bar(["STSS", "STEP"], [total_stss_stop_segments, total_step_stop_segments], color=["blue", "green"])
-            ax[0].set_title("Total Number of Stop Segments (Across 50 files)")
+            ax[0].set_title(
+                f"Total Number of Stop Segments (Across {len(results)} files)"
+            )
             ax[0].set_ylabel("Number of Stop Segments")
             for i, v in enumerate([total_stss_stop_segments, total_step_stop_segments]):
                 ax[0].text(i, v + (max(total_stss_stop_segments, total_step_stop_segments)*0.01), str(v), ha='center')
 
             # Stop Points bar chart
             ax[1].bar(["STSS", "STEP"], [total_stss_points, total_step_points], color=["blue", "green"])
-            ax[1].set_title("Total Number of Stop Points (Across 50 files)")
+            ax[1].set_title(
+                f"Total Number of Stop Points (Across {len(results)} files)"
+            )
             ax[1].set_ylabel("Number of Stop Points")
             for i, v in enumerate([total_stss_points, total_step_points]):
                 ax[1].text(i, v + (max(total_stss_points, total_step_points)*0.01), str(v), ha='center')

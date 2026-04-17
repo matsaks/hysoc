@@ -19,9 +19,9 @@ from constants.segmentation_defaults import (
 
 from core.point import Point
 from core.segment import Segment, Stop, Move
-from oracle.oracleG import STSSOracleSklearn
-from oracle.dpOracle import DPOracle
-from engines.stop_compression.compressor import StopCompressor, CompressedStop
+from oracle.oracleG import OracleG
+from oracle.oracleDP import OracleDP
+from engines.stop_compressor import StopCompressor, CompressedStop
 from eval import calculate_compression_ratio, calculate_sed_stats
 
 def load_trajectory(filepath: str) -> List[Point]:
@@ -51,8 +51,8 @@ def main():
         return
 
     # 1. Segment using STSS
-    print("Running STSSOracleSklearn...")
-    oracle = STSSOracleSklearn(
+    print("Running OracleG...")
+    oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,
@@ -68,7 +68,7 @@ def main():
     # 2. Compress using DP Oracle
     print("Compressing using Douglas-Peucker Oracle...")
     stop_compressor = StopCompressor()
-    dp_oracle = DPOracle(epsilon_meters=15.0)  # Moderate geometric tolerance
+    dp_oracle = OracleDP(epsilon_meters=15.0)  # Moderate geometric tolerance
     
     processed_items = []
 

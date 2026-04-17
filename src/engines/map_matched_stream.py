@@ -1,7 +1,7 @@
 from typing import Iterator
 
 from core.point import Point
-from engines.map_matching.matcher import OnlineMapMatcher
+from engines.hmm import OnlineMapMatcher
 
 
 class MapMatchedStreamWrapper:

@@ -2,12 +2,12 @@ import unittest
 from datetime import datetime, timedelta
 
 from core.point import Point
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.hybrid_squish_dp import (
+from engines.dp import DouglasPeuckerCompressor
+from engines.squish_dp import (
     HybridSquishDPCompressor,
     HybridSquishDPConfig,
 )
-from engines.move_compression.squish import SquishCompressor
+from engines.squish import SquishCompressor
 
 
 class TestHybridSquishDPCompressor(unittest.TestCase):

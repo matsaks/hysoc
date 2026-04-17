@@ -9,8 +9,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 from core.point import Point
 from core.segment import Stop, Move
-from oracle.oracleG import STSSOracleSklearn
-from oracle.oracleG import STSSOracleManual
+from oracle.oracleG import OracleG
 
 @pytest.fixture
 def synthetic_trajectory():
@@ -58,7 +57,7 @@ def synthetic_trajectory():
 def test_stss_sklearn(synthetic_trajectory):
     # max_eps 50m. 0->0.001 deg is approx 111m. So A and B are distinct.
     # min_duration 60s. Points are 1 min apart.
-    oracle = STSSOracleSklearn(min_samples=3, max_eps=50.0, min_duration_seconds=120.0)
+    oracle = OracleG(min_samples=3, max_eps=50.0, min_duration_seconds=120.0)
     segments = oracle.process(synthetic_trajectory)
     
     # Expect: Stop A, Move, Stop B
@@ -79,7 +78,7 @@ def test_stss_sklearn(synthetic_trajectory):
     assert abs(stops[-1].centroid.lon - 0.001) < 0.0001
 
 def test_stss_manual(synthetic_trajectory):
-    oracle = STSSOracleManual(min_samples=3, max_eps=50.0, min_duration_seconds=120.0)
+    oracle = OracleG(min_samples=3, max_eps=50.0, min_duration_seconds=120.0, backend="manual")
     segments = oracle.process(synthetic_trajectory)
     
     stops = [s for s in segments if isinstance(s, Stop)]
@@ -96,8 +95,8 @@ def test_manual_parity(synthetic_trajectory):
     """
     Ensure both oracles produce similar results on simple data.
     """
-    oracle1 = STSSOracleSklearn(min_samples=2, max_eps=50.0)
-    oracle2 = STSSOracleManual(min_samples=2, max_eps=50.0)
+    oracle1 = OracleG(min_samples=2, max_eps=50.0)
+    oracle2 = OracleG(min_samples=2, max_eps=50.0, backend="manual")
     
     segs1 = oracle1.process(synthetic_trajectory)
     segs2 = oracle2.process(synthetic_trajectory)

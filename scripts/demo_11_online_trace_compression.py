@@ -14,7 +14,7 @@ sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, "src"))
 
 from core.point import Point
-from engines.move_compression.trace import TraceCompressor, TraceConfig
+from engines.trace import TraceCompressor, TraceConfig
 
 def load_trajectory(filepath: str) -> list[Point]:
     """Loads a trajectory from a CSV file."""

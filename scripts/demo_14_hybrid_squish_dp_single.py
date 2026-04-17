@@ -24,15 +24,15 @@ from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
 from core.point import Point
 from core.segment import Move, Stop
 from eval import calculate_sed_stats
-from engines.move_compression.dp import DouglasPeuckerCompressor
-from engines.move_compression.hybrid_squish_dp import (
+from engines.dp import DouglasPeuckerCompressor
+from engines.squish_dp import (
     HybridSquishDPCompressor,
     HybridSquishDPConfig,
 )
-from engines.move_compression.squish import SquishCompressor
-from engines.stop_compression.compressor import CompressedStop, StopCompressor
-from oracle.dpOracle import DPOracle
-from oracle.oracleG import STSSOracleSklearn
+from engines.squish import SquishCompressor
+from engines.stop_compressor import CompressedStop, StopCompressor
+from oracle.oracleDP import OracleDP
+from oracle.oracleG import OracleG
 
 
 DEFAULT_SUBSET = "subset_50"
@@ -321,8 +321,8 @@ def main() -> None:
         raise ValueError(f"Not enough points in trajectory ({len(trajectory)}).")
     print(f"Loaded {len(trajectory)} points.")
 
-    print("Segmenting (STSSOracleSklearn)...")
-    oracle = STSSOracleSklearn(
+    print("Segmenting (OracleG)...")
+    oracle = OracleG(
         min_samples=STSS_MIN_SAMPLES,
         max_eps=STOP_MAX_EPS_METERS,
         min_duration_seconds=STOP_MIN_DURATION_SECONDS,
@@ -346,7 +346,7 @@ def main() -> None:
         )
     )
 
-    dp_oracle = DPOracle(epsilon_meters=args.dp_epsilon_meters)
+    dp_oracle = OracleDP(epsilon_meters=args.dp_epsilon_meters)
 
     processed_squish: List[object] = []
     processed_hybrid: List[object] = []

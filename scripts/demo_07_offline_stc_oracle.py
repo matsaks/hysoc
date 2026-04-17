@@ -12,7 +12,7 @@ sys.path.append(os.path.join(project_root, "src"))
 
 from core.stream import TrajectoryStream
 from core.segment import Move
-from oracle.oracleN import STCOracle
+from oracle.oracleN import OracleN
 
 def main():
     # 1. Load Data
@@ -38,11 +38,11 @@ def main():
         return
 
     # 2. Compress using STC (Semantic Trajectory Compression)
-    print("Running STCOracle...")
+    print("Running OracleN...")
     # We treat the entire trajectory as one Move segment for this pure STC demonstration
     # In a full hybrid system, STSS would first split into Stops/Moves.
     move_segment = Move(points=trajectory)
-    oracle = STCOracle()
+    oracle = OracleN()
     compressed_points = oracle.process(move_segment)
     
     print(f"Compression complete.")
