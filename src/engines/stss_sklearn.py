@@ -47,7 +47,15 @@ class STSSOracleSklearn:
         # max_eps is in meters, convert to radians: dist / radius
         max_eps_rad = self.max_eps / EARTH_RADIUS_M
 
-        clustering = OPTICS(min_samples=self.min_samples, max_eps=max_eps_rad, metric='haversine')
+        # xi=0.02: steepness threshold for OPTICS cluster extraction, as recommended
+        # by Liu et al. (2021) "A Semantics-Based Trajectory Segmentation Simplification
+        # Method" (J. Geovis. Spat. Anal.), Sect. 3.2.
+        clustering = OPTICS(
+            min_samples=self.min_samples,
+            max_eps=max_eps_rad,
+            metric='haversine',
+            xi=0.02,
+        )
         clustering.fit(coords)
         
         labels = clustering.labels_
