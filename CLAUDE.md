@@ -4,7 +4,19 @@ Act as a rigorous, honest mentor. do not default to agreement. identify weakness
 
 ## Project Overview
 
-Master's thesis on **Online Semantic Trajectory Compression** using a novel, fully online framework named HYSOC. The core contribution is the hybridization of real-time behavioral STOP/MOVE segmentation with dual geometric and network-based compression strategies. This approach addresses a critical research gap by integrating event-based behavioral semantics with path-referential encoding, a combination currently absent in specialized state-of-the-art systems. The system is benchmarked against offline oracles to validate its ability to balance compression ratios, information preservation, and processing latency in large-scale GPS streams.
+Master's thesis on **Online Semantic Trajectory Compression** using a novel, fully online framework named HYSOC (Hybrid Online Semantic Compression System). The core contribution is the hybridization of real-time behavioral STOP/MOVE segmentation with dual geometric and network-based compression strategies. This approach addresses a critical research gap by integrating event-based behavioral semantics with path-referential encoding, a combination currently absent in specialized state-of-the-art systems. The system is benchmarked against offline oracles to validate its ability to balance compression ratios, information preservation, and processing latency in large-scale GPS streams.
+
+The preproject report (`papers/pdfs/Online_Semantic_Trajectory_Compression.pdf`, citekey `Online_Semantic_Trajectory_Compression`) established the conceptual foundation and evaluation protocol. It defines the three-module streaming pipeline:
+
+- **Module I — Streaming Segmenter**: Real-time STOP/MOVE segmentation using high-performance grid indexing for instant coordinate categorisation.
+- **Module II — Stop Segment Compressor**: Semantic abstraction replacing dense GPS noise clusters with a single representative coordinate pair plus timestamps.
+- **Module III — Move Segment Compressors**: Two strategies — (a) **HYSOC-G**: geometric compression via the SQUISH algorithm; (b) **HYSOC-N**: network-semantic compression combining a Hidden Markov Model with k-mer reference matching.
+
+**Evaluation protocol** (established in preproject, to be validated in the thesis):
+- Baselines: offline oracles using divide-and-conquer algorithms (e.g., STSS).
+- Efficiency metrics: Processing Latency, Compression Ratio.
+- Fidelity metrics: Synchronized Euclidean Distance (geometric), F1-Score (stop detection accuracy).
+- Dataset: large-scale, high-resolution trajectories (WorldTrace).
 
 ## Repository Layout
 
@@ -71,6 +83,28 @@ When asked to write a thesis section, follow this sequence:
 3. **Calibrate style**: Read `thesis/chapters/introduction.tex` and `thesis/chapters/background.tex` before drafting to match tone and structure.
 4. **Use provided results**: The user will supply CSV files with experimental results and access to the relevant source code. Use these to write the experimental narrative accurately.
 5. **Draft the section**: Write in the academic style defined below. Cite only keys present in `thesis/bib/bibliography.bib`. If a required reference is missing, ask the user before adding it — then add a complete BibTeX entry to `thesis/bib/bibliography.bib` following the existing style conventions before citing it.
+
+## Thesis Commit & Push Workflow
+
+The `thesis/` directory is a Git submodule linked to Overleaf. When committing thesis changes, always follow this two-step process:
+
+1. **Commit and push inside the submodule**:
+   ```bash
+   cd thesis
+   git add .
+   git commit -m "Your message"
+   git push
+   cd ..
+   ```
+
+2. **Update the submodule pointer in the parent repo**:
+   ```bash
+   git add thesis
+   git commit -m "update thesis submodule pointer"
+   git push
+   ```
+
+Both steps are required — the first pushes the actual thesis content to Overleaf, the second records which thesis commit the parent repo points to.
 
 ## Coding Standards
 
