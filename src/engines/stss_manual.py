@@ -81,10 +81,6 @@ class STSSOracleManual:
                 continue
             else:
                 # Start new cluster
-                cluster_id += 0  # 0-indexed labels for consistency? 
-                # Actually let's use 0, 1, 2...
-                # Current cluster_id is 0
-                
                 labels[i] = cluster_id
                 
                 # Expand cluster
