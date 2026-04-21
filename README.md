@@ -46,6 +46,44 @@ hysoc/
 ├── pyproject.toml              # Dependencies and project config (managed by uv)
 └── uv.lock                     # Exact version locking
 
+## 📖 Submodule: Thesis (Overleaf)
+
+The `thesis/` directory is a Git submodule linked to the Overleaf repository.
+
+### Pulling changes (Overleaf → local)
+
+To fetch the latest thesis changes after editing on Overleaf:
+
+```bash
+git submodule update --remote thesis
+git add thesis
+git commit -m "Update thesis submodule"
+```
+
+### Pushing changes (local → Overleaf)
+
+To push local thesis edits back to Overleaf:
+
+```bash
+cd thesis
+git add .
+git commit -m "Your message"
+git push
+cd ..
+git add thesis
+git commit -m "Update thesis submodule pointer"
+```
+
+### First-time setup (after cloning)
+
+If the `thesis/` directory is empty after cloning, initialise the submodule:
+
+```bash
+git submodule update --init thesis
+```
+
+---
+
 ## 🚦 Streaming Simulator
 To verify algorithms in real-time without physical devices, HYSOC includes a **Trajectory Simulation** module.
 
