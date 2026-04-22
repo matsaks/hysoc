@@ -1,18 +1,13 @@
-from typing import List
-from core.point import Point
+"""Compression-ratio metrics."""
+from core.compression import TrajectoryResult
 
-def calculate_compression_ratio(original: List[Point], compressed: List[Point]) -> float:
+
+def calculate_compression_ratio(result: TrajectoryResult) -> float:
     """
-    Calculates the compression ratio.
-    Ratio = Original Count / Compressed Count.
-    
-    Args:
-        original: List of original points.
-        compressed: List of compressed points.
-        
-    Returns:
-        Compression ratio (e.g., 10.0 for 10:1 compression). Returns 1.0 if compressed is empty.
+    Byte-based compression ratio: original_bytes / encoded_bytes.
+
+    For point-list strategies (HYSOC-G, oracles) this equals the point-count
+    ratio. For TRACE-based strategies (HYSOC-N) it reflects the actual
+    encoding cost rather than the residual point count.
     """
-    if not compressed:
-        return 1.0
-    return len(original) / len(compressed)
+    return result.compression_ratio

@@ -9,21 +9,49 @@ TDT4501 preproject (Sect. 4.6.1, Eq. 6):
 This is stricter than the preproject's prose ("overlaps ... by at least
 50 %"), which is an informal gloss. Implementation follows Eq. 6 literally.
 
-The module exposes three helpers:
+The module exposes:
 
-- `segment_counts`: descriptive counts used by the parameter sweep.
-- `stop_temporal_iou`: the pairwise matching function.
-- `stop_f1`: Precision / Recall / F1 under the IoU >= 0.5 rule, used by
-  RQ1 experiments (preproject Sect. 4.6.1).
+- `segment_counts`: descriptive counts over raw Stop/Move segments.
+- `segment_counts_from_result`: same counts over a TrajectoryResult.
+- `stop_temporal_iou`: pairwise IoU between two Stop segments.
+- `stop_f1`: F1 over raw Stop/Move segments (for oracle comparisons).
+- `stop_f1_from_result`: F1 between two TrajectoryResults.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Iterable, Sequence
 
 from core.segment import Segment, Stop, Move
+from core.compression import SegmentResult, TrajectoryResult
 
+
+# ------------------------------------------------------------------
+# Internal helper
+# ------------------------------------------------------------------
+
+def _temporal_iou(
+    a_start: datetime, a_end: datetime,
+    b_start: datetime, b_end: datetime,
+) -> float:
+    inter_start = max(a_start, b_start)
+    inter_end = min(a_end, b_end)
+    inter = (inter_end - inter_start).total_seconds()
+    if inter <= 0.0:
+        return 0.0
+    a_dur = (a_end - a_start).total_seconds()
+    b_dur = (b_end - b_start).total_seconds()
+    union = a_dur + b_dur - inter
+    if union <= 0.0:
+        return 0.0
+    return inter / union
+
+
+# ------------------------------------------------------------------
+# Descriptive counts
+# ------------------------------------------------------------------
 
 def segment_counts(segments: Iterable[Segment]) -> dict[str, float]:
     """
@@ -34,8 +62,6 @@ def segment_counts(segments: Iterable[Segment]) -> dict[str, float]:
       - mean_stop_duration_s, mean_move_duration_s
       - mean_stop_points, mean_move_points
       - total_points
-
-    Missing categories yield 0 counts and 0.0 means (no NaN propagation).
     """
     stops: list[Stop] = []
     moves: list[Move] = []
@@ -60,9 +86,7 @@ def segment_counts(segments: Iterable[Segment]) -> dict[str, float]:
             return 0.0
         return sum(len(s.points) for s in segs) / len(segs)
 
-    total_points = sum(len(s.points) for s in stops) + sum(
-        len(s.points) for s in moves
-    )
+    total_points = sum(len(s.points) for s in stops) + sum(len(s.points) for s in moves)
 
     return {
         "n_stops": len(stops),
@@ -75,40 +99,58 @@ def segment_counts(segments: Iterable[Segment]) -> dict[str, float]:
     }
 
 
+def segment_counts_from_result(result: TrajectoryResult) -> dict[str, float]:
+    """
+    Descriptive counts over a TrajectoryResult.
+
+    Returns a dict with keys:
+      - n_stops, n_moves
+      - mean_stop_duration_s, mean_move_duration_s
+      - mean_stop_keypoints, mean_move_keypoints
+      - total_keypoints
+    """
+    stops = result.stops()
+    moves = result.moves()
+
+    def _mean_duration(segs: list[SegmentResult]) -> float:
+        if not segs:
+            return 0.0
+        return sum((s.end_time - s.start_time).total_seconds() for s in segs) / len(segs)
+
+    def _mean_keypoints(segs: list[SegmentResult]) -> float:
+        if not segs:
+            return 0.0
+        return sum(len(s.keypoints) for s in segs) / len(segs)
+
+    return {
+        "n_stops": len(stops),
+        "n_moves": len(moves),
+        "mean_stop_duration_s": _mean_duration(stops),
+        "mean_move_duration_s": _mean_duration(moves),
+        "mean_stop_keypoints": _mean_keypoints(stops),
+        "mean_move_keypoints": _mean_keypoints(moves),
+        "total_keypoints": float(len(result.keypoints)),
+    }
+
+
+# ------------------------------------------------------------------
+# IoU and F1
+# ------------------------------------------------------------------
+
 def stop_temporal_iou(a: Stop, b: Stop) -> float:
     """
     Temporal IoU (Jaccard) between two Stop segments.
 
     Returns `duration(a ∩ b) / duration(a ∪ b)` in the closed time domain.
-    Zero-duration stops (single-point) are allowed: intersection is 0 unless
-    the single instant is contained in the other segment, in which case
-    Jaccard reduces to 0 / |b| = 0.
     """
     if not a.points or not b.points:
         return 0.0
-
-    a_start, a_end = a.start_time, a.end_time
-    b_start, b_end = b.start_time, b.end_time
-
-    inter_start = max(a_start, b_start)
-    inter_end = min(a_end, b_end)
-    inter = (inter_end - inter_start).total_seconds()
-    if inter <= 0.0:
-        return 0.0
-
-    a_dur = (a_end - a_start).total_seconds()
-    b_dur = (b_end - b_start).total_seconds()
-    union = a_dur + b_dur - inter
-    if union <= 0.0:
-        return 0.0
-
-    return inter / union
+    return _temporal_iou(a.start_time, a.end_time, b.start_time, b.end_time)
 
 
 @dataclass(frozen=True)
 class F1Result:
     """Precision / Recall / F1 with supporting counts."""
-
     precision: float
     recall: float
     f1: float
@@ -124,22 +166,11 @@ def stop_f1(
     temporal_iou_threshold: float = 0.5,
 ) -> F1Result:
     """
-    F1 score for stop detection using temporal IoU matching.
+    F1 score for stop detection over raw Stop/Move segments.
 
     A predicted Stop is a True Positive iff it has IoU >= threshold with
     some unmatched ground-truth Stop (greedy 1:1 matching by best IoU,
     iterating predictions in chronological order).
-
-    Args:
-        predicted: segments produced by the algorithm under test (Stops and
-            Moves are accepted; Moves are ignored).
-        ground_truth: segments produced by the reference oracle.
-        temporal_iou_threshold: minimum IoU for a match. Default 0.5 per
-            TDT4501 preproject Eq. 6.
-
-    Returns:
-        F1Result with precision, recall, f1, TP/FP/FN counts, and the mean
-        IoU over matched pairs (0.0 if no matches).
     """
     pred_stops = sorted(
         (s for s in predicted if isinstance(s, Stop) and s.points),
@@ -149,28 +180,86 @@ def stop_f1(
         (s for s in ground_truth if isinstance(s, Stop) and s.points),
         key=lambda s: s.start_time,
     )
+    return _f1_from_stop_lists(
+        [(s.start_time, s.end_time) for s in pred_stops],
+        [(s.start_time, s.end_time) for s in gt_stops],
+        temporal_iou_threshold,
+    )
 
+
+def stop_f1_from_result(
+    predicted: TrajectoryResult,
+    ground_truth: TrajectoryResult,
+    temporal_iou_threshold: float = 0.5,
+) -> F1Result:
+    """F1 score for stop detection between two TrajectoryResults."""
+    pred_stops = sorted(predicted.stops(), key=lambda s: s.start_time)
+    gt_stops = sorted(ground_truth.stops(), key=lambda s: s.start_time)
+    return _f1_from_stop_lists(
+        [(s.start_time, s.end_time) for s in pred_stops],
+        [(s.start_time, s.end_time) for s in gt_stops],
+        temporal_iou_threshold,
+    )
+
+
+def road_segment_jaccard(
+    predicted: TrajectoryResult,
+    ground_truth: TrajectoryResult,
+) -> float:
+    """
+    Jaccard similarity between the road segment sets of two trajectories.
+
+    Compares the sets of road_id values present in the keypoints of each
+    result. Only points with a non-None road_id contribute. Returns 1.0 if
+    both sets are empty, 0.0 if exactly one is empty.
+    """
+    pred_ids = {
+        p.road_id
+        for seg in predicted.segments
+        for p in seg.keypoints
+        if p.road_id is not None
+    }
+    gt_ids = {
+        p.road_id
+        for seg in ground_truth.segments
+        for p in seg.keypoints
+        if p.road_id is not None
+    }
+
+    if not pred_ids and not gt_ids:
+        return float("nan")
+    if not pred_ids or not gt_ids:
+        return 0.0
+
+    return len(pred_ids & gt_ids) / len(pred_ids | gt_ids)
+
+
+def _f1_from_stop_lists(
+    predicted: list[tuple[datetime, datetime]],
+    ground_truth: list[tuple[datetime, datetime]],
+    threshold: float,
+) -> F1Result:
     matched_gt: set[int] = set()
     matched_ious: list[float] = []
     tp = 0
 
-    for p in pred_stops:
+    for p_start, p_end in predicted:
         best_iou = 0.0
         best_idx = -1
-        for i, g in enumerate(gt_stops):
+        for i, (g_start, g_end) in enumerate(ground_truth):
             if i in matched_gt:
                 continue
-            iou = stop_temporal_iou(p, g)
+            iou = _temporal_iou(p_start, p_end, g_start, g_end)
             if iou > best_iou:
                 best_iou = iou
                 best_idx = i
-        if best_idx >= 0 and best_iou >= temporal_iou_threshold:
+        if best_idx >= 0 and best_iou >= threshold:
             matched_gt.add(best_idx)
             matched_ious.append(best_iou)
             tp += 1
 
-    fp = len(pred_stops) - tp
-    fn = len(gt_stops) - tp
+    fp = len(predicted) - tp
+    fn = len(ground_truth) - tp
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
