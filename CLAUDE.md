@@ -12,10 +12,12 @@ The preproject report (`papers/pdfs/Online_Semantic_Trajectory_Compression.pdf`,
 - **Module II — Stop Segment Compressor**: Semantic abstraction replacing dense GPS noise clusters with a single representative coordinate pair plus timestamps.
 - **Module III — Move Segment Compressors**: Two strategies — (a) **HYSOC-G**: geometric compression via the SQUISH algorithm; (b) **HYSOC-N**: network-semantic compression combining a Hidden Markov Model with k-mer reference matching.
 
-**Evaluation protocol** (established in preproject, to be validated in the thesis):
-- Baselines: offline oracles using divide-and-conquer algorithms (e.g., STSS).
-- Efficiency metrics: Processing Latency, Compression Ratio.
-- Fidelity metrics: Synchronized Euclidean Distance (geometric), F1-Score (stop detection accuracy).
+**Evaluation protocol** (two-track, strategy-appropriate metrics):
+- Baselines: Oracle-G (STSS + Douglas–Peucker) and Oracle-N (STSS + STC).
+- Efficiency: byte-based Compression Ratio (`original_bytes / encoded_bytes`, `BYTES_PER_POINT = 24`) — uniform across both strategies.
+- Stop fidelity: Stop F₁ with temporal IoU ≥ 0.5 threshold — applicable to both strategies.
+- Geometric fidelity (HYSOC-G / Oracle-G only): Synchronized Euclidean Distance (SED).
+- Network fidelity (HYSOC-N / Oracle-N only): Road-segment Jaccard similarity over `road_id` sets; returns `nan` when no road IDs are present to prevent false perfect scores.
 - Dataset: large-scale, high-resolution trajectories (WorldTrace).
 
 ## Repository Layout
@@ -123,6 +125,14 @@ Both steps are required — the first pushes the actual thesis content to Overle
 - **Imports**: stdlib → third-party → local; scripts prepend `sys.path` with project root and `src/`.
 - **Constants**: define in `src/constants/` and import — never hardcode magic numbers inline.
 - **No dead code**: do not leave commented-out code blocks or unused imports.
+
+### Core types (`src/core/compression.py`)
+
+All compression strategies produce a `TrajectoryResult`; eval code operates on this single type.
+
+- **`BYTES_PER_POINT = 24`** — lat (float64) + lon (float64) + timestamp (int64).
+- **`SegmentResult`** (frozen dataclass) — `kind: Literal["stop","move"]`, `start_time`, `end_time`, `keypoints: list[Point]`, `encoded_bytes: int`. For point-list strategies `encoded_bytes = len(keypoints) * BYTES_PER_POINT`; for TRACE it is the actual encoding size.
+- **`TrajectoryResult`** — `object_id`, `original_points`, `segments: list[SegmentResult]`, `strategy`. Properties: `keypoints` (flat reconstruction), `original_bytes`, `encoded_bytes`, `compression_ratio`. Methods: `stops()`, `moves()`.
 
 ### Before writing any code
 Read the relevant existing source file(s) first. Match the style exactly — do not introduce new patterns unless the user explicitly asks.
