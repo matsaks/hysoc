@@ -143,7 +143,7 @@ Before drafting any new text, read `thesis/chapters/introduction.tex` and `thesi
 
 Key observed patterns:
 
-- Vary sentence length — mix short factual statements with longer explanatory ones
+- Vary sentence length — this is important. Mix short factual statements with longer explanatory ones
 - Cite authors by name inline when their identity adds context ("According to X \cite{X}"), otherwise cite anonymously
 - Use specific percentages and statistics; do not write "many" or "most" when a number is available
 - Paragraphs are 3–5 sentences; do not pad
@@ -156,3 +156,4 @@ Key observed patterns:
 - Parallel sentence openers within the same paragraph
 - Tidy one-sentence summary restating the paragraph at the end
 - "In this section, we..." / "This subsection presents..."
+- `---`, `:`, or `;` in prose, unless strictly necessary
