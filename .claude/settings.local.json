@@ -1,7 +1,13 @@
 {
+  "attribution": {
+    "commit": ""
+  },
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git submodule *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
