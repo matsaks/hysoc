@@ -52,3 +52,8 @@ data/processed/
 
 # Cache
 cache/
+
+# Claude reports
+citation-audits/
+thesis-todo-reports/
+
