@@ -21,7 +21,7 @@ def run_hysoc(input_path: Path, mode: str) -> None:
     stream = TrajectoryStream(filepath=input_path, col_mapping={"lat": "latitude", "lon": "longitude", "timestamp": "time"})
     points = list(stream.stream())
     result = HYSOCCompressor(config=config).compress(points)
-    print(f"[{mode}] Compressed {result.total_original_points} -> {result.total_compressed_points} points")
+    print(f"[{mode}] Compressed {len(result.original_points)} -> {len(result.keypoints)} points")
 
 
 def main() -> None:

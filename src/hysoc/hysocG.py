@@ -20,10 +20,11 @@ from typing import List, Optional
 from core.point import Point
 from core.segment import Segment, Stop, Move
 from core.compression import (
+    BYTES_PER_POINT,
     CompressionStrategy,
     HYSOCConfig,
-    CompressedSegment,
-    CompressedTrajectory,
+    SegmentResult,
+    TrajectoryResult,
 )
 from engines.step import STEPSegmenter
 from engines.stop_compressor import StopCompressor
@@ -64,7 +65,7 @@ class HYSOCGCompressor:
         )
 
         # Module II: Stop Compression
-        self.stop_compressor = StopCompressor()
+        self.stop_compressor = StopCompressor(strategy=self.config.stop_compression_strategy)
 
         # Module III: Move Compression
         if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
@@ -103,7 +104,7 @@ class HYSOCGCompressor:
     # Streaming interface
     # ------------------------------------------------------------------
 
-    def process_point(self, point: Point) -> List[CompressedSegment]:
+    def process_point(self, point: Point) -> List[SegmentResult]:
         """
         Processes a single point through the streaming pipeline.
         Returns any fully compressed segments that were closed by this point.
@@ -138,7 +139,7 @@ class HYSOCGCompressor:
 
         return compressed
 
-    def flush(self) -> List[CompressedSegment]:
+    def flush(self) -> List[SegmentResult]:
         """Flushes and compresses any remaining buffered segments."""
         compressed = []
 
@@ -172,71 +173,61 @@ class HYSOCGCompressor:
     # Batch interface
     # ------------------------------------------------------------------
 
-    def compress(self, points: List[Point]) -> CompressedTrajectory:
+    def compress(self, points: List[Point]) -> TrajectoryResult:
         """
         Batch wrapper — pushes all points through the streaming pipeline
         and collects the result.
         """
         self.__init__(self.config)
 
-        compressed_segments = []
+        segments: List[SegmentResult] = []
         for point in points:
-            compressed_segments.extend(self.process_point(point))
-        compressed_segments.extend(self.flush())
+            segments.extend(self.process_point(point))
+        segments.extend(self.flush())
 
-        factor = 0.0
-        if self._total_points_compressed > 0:
-            factor = self._total_points_in / self._total_points_compressed
+        object_id = points[0].obj_id if points else ""
 
-        return CompressedTrajectory(
+        return TrajectoryResult(
+            object_id=object_id,
             original_points=points,
-            compressed_segments=compressed_segments,
-            total_original_points=self._total_points_in,
-            total_compressed_points=self._total_points_compressed,
-            overall_compression_factor=factor,
-            compression_strategy=self.config.move_compression_strategy,
+            segments=segments,
+            strategy=self.config.move_compression_strategy,
         )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _compress_segment(self, seg: Segment) -> Optional[CompressedSegment]:
+    def _compress_segment(self, seg: Segment) -> Optional[SegmentResult]:
         """Routes a detected segment to the appropriate compressor."""
         if isinstance(seg, Stop):
             if self.config.compress_stops:
-                compressed_data = self.stop_compressor.compress(seg.points)
-                total_compressed = 1
+                compressed_stop = self.stop_compressor.compress(seg.points)
+                keypoints = [compressed_stop.centroid]
             else:
-                compressed_data = seg
-                total_compressed = len(seg.points)
+                keypoints = list(seg.points)
 
-            compression_factor = (
-                len(seg.points) / total_compressed
-                if total_compressed > 0
-                else 0.0
-            )
-            self._total_points_compressed += total_compressed
-
-            return CompressedSegment(
-                segment_type="stop",
-                original_segment=seg,
-                compressed_data=compressed_data,
-                compression_factor=compression_factor,
+            self._total_points_compressed += len(keypoints)
+            return SegmentResult(
+                kind="stop",
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+                keypoints=keypoints,
+                encoded_bytes=len(keypoints) * BYTES_PER_POINT,
             )
 
         elif isinstance(seg, Move):
             if self.config.move_compression_strategy == CompressionStrategy.GEOMETRIC:
                 squish_result = self.squish_compressor.compress(seg.points)
-                compressed_data = self.dp_compressor.compress(squish_result)
-                total_compressed = len(compressed_data)
+                keypoints = self.dp_compressor.compress(squish_result)
+                encoded_bytes = len(keypoints) * BYTES_PER_POINT
             else:
                 t0 = time.perf_counter()
                 trace_result = self.move_compressor.compress(seg.points)
                 t1 = time.perf_counter()
                 self.diagnostics["trace_time_s"] += float(t1 - t0)
                 t0 = time.perf_counter()
-                retained_points, counters = self._extract_retained_points_from_trace(seg.points)
+                keypoints, counters = self._extract_retained_points_from_trace(seg.points)
                 t1 = time.perf_counter()
                 self.diagnostics["trace_retained_extract_time_s"] += float(t1 - t0)
                 self.diagnostics["retention_move_segments"] += 1
@@ -245,24 +236,15 @@ class HYSOCGCompressor:
                 self.diagnostics["retention_kept_road_change"] += counters["road_change_kept"]
                 self.diagnostics["retention_kept_speed_change"] += counters["speed_change_kept"]
                 self.diagnostics["retention_forced_last_point"] += counters["forced_last_point"]
-                compressed_data = {
-                    "trace_result": trace_result,
-                    "retained_points": retained_points,
-                }
-                total_compressed = len(retained_points)
+                encoded_bytes = self._trace_encoded_bytes(trace_result)
 
-            compression_factor = (
-                len(seg.points) / total_compressed
-                if total_compressed > 0
-                else 0.0
-            )
-            self._total_points_compressed += total_compressed
-
-            return CompressedSegment(
-                segment_type="move",
-                original_segment=seg,
-                compressed_data=compressed_data,
-                compression_factor=compression_factor,
+            self._total_points_compressed += len(keypoints)
+            return SegmentResult(
+                kind="move",
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+                keypoints=keypoints,
+                encoded_bytes=encoded_bytes,
             )
 
         return None
@@ -332,6 +314,21 @@ class HYSOCGCompressor:
             "forced_last_point": forced_last_point,
         }
         return retained_points, counters
+
+    @staticmethod
+    def _trace_encoded_bytes(trace_result: Optional[dict]) -> int:
+        """Compute byte cost of a TRACE result.
+
+        Match tuples (ref_id, start, length, mismatch) cost 16 bytes (4 × int32);
+        literals cost 4 bytes each.
+        """
+        if not trace_result:
+            return 0
+        total = 0
+        for seq in (trace_result.get("E", []), trace_result.get("V", [])):
+            for item in seq:
+                total += 16 if isinstance(item, tuple) else 4
+        return total
 
     def get_diagnostics(self) -> dict:
         diag = dict(self.diagnostics)
@@ -409,8 +406,8 @@ def main(input_file: Optional[str] = None):
     compressor = HYSOCGCompressor(config=config)
     result = compressor.compress(points)
 
-    print(f"Compressed {result.total_original_points} → {result.total_compressed_points} points "
-          f"({len(result.compressed_segments)} segments)")
+    print(f"Compressed {len(result.original_points)} → {len(result.keypoints)} points "
+          f"({len(result.segments)} segments)")
 
 
 if __name__ == "__main__":
