@@ -16,6 +16,7 @@ from constants.dp_defaults import DP_DEFAULT_EPSILON_METERS
 from constants.hysoc_defaults import HYSOC_DEFAULT_COMPRESS_STOPS
 from constants.segmentation_defaults import STOP_MAX_EPS_METERS, STOP_MIN_DURATION_SECONDS
 from constants.squish_defaults import SQUISH_DEFAULT_CAPACITY
+from constants.stop_compression_defaults import StopCompressionStrategy, STOP_COMPRESSION_DEFAULT_STRATEGY
 
 # Byte cost of one raw GPS fix: lat (float64=8) + lon (float64=8) + timestamp (int64=8).
 BYTES_PER_POINT: int = 24
@@ -31,6 +32,7 @@ class CompressionStrategy(Enum):
 class HYSOCConfig:
     """Configuration for the unified HYSOC pipeline."""
     move_compression_strategy: CompressionStrategy = CompressionStrategy.GEOMETRIC
+    stop_compression_strategy: StopCompressionStrategy = STOP_COMPRESSION_DEFAULT_STRATEGY
     stop_max_eps_meters: float = STOP_MAX_EPS_METERS
     stop_min_duration_seconds: float = STOP_MIN_DURATION_SECONDS
     compress_stops: bool = HYSOC_DEFAULT_COMPRESS_STOPS
