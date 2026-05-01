@@ -164,8 +164,8 @@ def compute_segmented_metrics(original: List[Point], items: List[object], latenc
 
 
 def compute_hysoc_metrics(original: List[Point], compressed_trajectory, latency_us: float) -> Dict[str, Any]:
-    reconstructed = compressed_trajectory.get_reconstructed_points()
-    stored_points = compressed_trajectory.total_compressed_points
+    reconstructed = compressed_trajectory.keypoints
+    stored_points = len(reconstructed)
     cr = len(original) / max(1, stored_points)
     stats = calculate_sed_stats(original, reconstructed)
     sed_errors = stats.get("sed_errors", [])
@@ -202,23 +202,20 @@ def map_match_points(raw_points: List[Point], graph) -> List[Point]:
 
 
 def compressed_trajectory_to_items(compressed_trajectory) -> List[object]:
-    """Convert CompressedTrajectory segments into Stop/Move-like items for plotting."""
+    """Convert TrajectoryResult segments into Stop/Move-like items for plotting."""
+    from engines.stop_compressor import CompressedStop
+
     items: List[object] = []
-    for seg in compressed_trajectory.compressed_segments:
-        data = seg.compressed_data
-        if seg.segment_type == "stop":
-            items.append(data)
-            continue
-
-        move_points: List[Point] = []
-        if isinstance(data, list):
-            move_points = data
-        elif isinstance(data, dict) and "retained_points" in data:
-            move_points = data["retained_points"]
-        elif hasattr(data, "points") and data.points:
-            move_points = data.points
-
-        items.append(Move(points=move_points))
+    for seg in compressed_trajectory.segments:
+        if seg.kind == "stop" and seg.keypoints:
+            centroid = seg.keypoints[0]
+            items.append(CompressedStop(
+                centroid=centroid,
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+            ))
+        elif seg.kind == "move":
+            items.append(Move(points=seg.keypoints))
     return items
 
 

@@ -32,31 +32,19 @@ from hysoc.hysocG import CompressionStrategy, HYSOCCompressor, HYSOCConfig
 DEFAULT_INPUT_DIR: str = os.path.join("data", "raw", "London_Final_100")
 
 
-def extract_compressed_points_separate(compressed_trajectory) -> tuple[list[Point], list[Point], list[list[Point]]]:
+def extract_compressed_points_separate(result) -> tuple[list[Point], list[Point], list[list[Point]]]:
     """Extract compressed points as (all_points, stop_points, move_segments)."""
     all_points: list[Point] = []
     stop_points: list[Point] = []
     move_segments: list[list[Point]] = []
 
-    for seg in compressed_trajectory.compressed_segments:
-        if seg.segment_type == "stop":
-            if hasattr(seg.compressed_data, "centroid"):
-                stop_pt = seg.compressed_data.centroid
-                all_points.append(stop_pt)
-                stop_points.append(stop_pt)
-        elif seg.segment_type == "move":
-            data = seg.compressed_data
-            move_pts: list[Point] = []
-            if isinstance(data, list):
-                move_pts = data
-            elif isinstance(data, dict):
-                move_pts = data.get("retained_points", [])
-            elif hasattr(data, "points"):
-                move_pts = data.points
-
-            if move_pts:
-                move_segments.append(move_pts)
-                all_points.extend(move_pts)
+    for seg in result.segments:
+        if seg.kind == "stop":
+            all_points.extend(seg.keypoints)
+            stop_points.extend(seg.keypoints)
+        elif seg.kind == "move" and seg.keypoints:
+            move_segments.append(seg.keypoints)
+            all_points.extend(seg.keypoints)
 
     return all_points, stop_points, move_segments
 
@@ -106,16 +94,17 @@ def process_single_file(data_path: str, strategy: str, output_dir: str) -> dict[
     if not raw_points:
         raise ValueError("Input trajectory is empty.")
 
-    lats = [p.lat for p in raw_points]
-    lons = [p.lon for p in raw_points]
-    north, south = max(lats) + 0.01, min(lats) - 0.01
-    east, west = max(lons) + 0.01, min(lons) - 0.01
-
-    print(
-        f"  Downloading graph bbox W:{west:.4f} S:{south:.4f} E:{east:.4f} N:{north:.4f}"
-    )
-    graph = ox.graph_from_bbox(bbox=(west, south, east, north), network_type="drive")
-    print(f"  Graph ready. Nodes: {len(graph.nodes)}, Edges: {len(graph.edges)}")
+    graph = None
+    if strategy in ["network_semantic", "both"]:
+        lats = [p.lat for p in raw_points]
+        lons = [p.lon for p in raw_points]
+        north, south = max(lats) + 0.01, min(lats) - 0.01
+        east, west = max(lons) + 0.01, min(lons) - 0.01
+        print(
+            f"  Downloading graph bbox W:{west:.4f} S:{south:.4f} E:{east:.4f} N:{north:.4f}"
+        )
+        graph = ox.graph_from_bbox(bbox=(west, south, east, north), network_type="drive")
+        print(f"  Graph ready. Nodes: {len(graph.nodes)}, Edges: {len(graph.edges)}")
 
     results: dict[str, Any] = {
         "input_file": os.path.basename(data_path),
@@ -132,17 +121,14 @@ def process_single_file(data_path: str, strategy: str, output_dir: str) -> dict[
         )
         compressed_g = HYSOCCompressor(config=config_g).compress(raw_points)
         all_points_g, stop_points_g, _move_segments_g = extract_compressed_points_separate(compressed_g)
-        stops_count = sum(1 for s in compressed_g.compressed_segments if s.segment_type == "stop")
-        moves_count = sum(1 for s in compressed_g.compressed_segments if s.segment_type == "move")
-        factor_g = _safe_ratio(compressed_g.total_original_points, compressed_g.total_compressed_points)
 
         results["strategies"]["geometric"] = {
-            "original_points": compressed_g.total_original_points,
-            "compressed_points": compressed_g.total_compressed_points,
-            "compression_ratio": factor_g,
-            "num_segments": len(compressed_g.compressed_segments),
-            "num_stops": stops_count,
-            "num_moves": moves_count,
+            "original_points": len(compressed_g.original_points),
+            "compressed_points": len(compressed_g.keypoints),
+            "compression_ratio": compressed_g.compression_ratio,
+            "num_segments": len(compressed_g.segments),
+            "num_stops": len(compressed_g.stops()),
+            "num_moves": len(compressed_g.moves()),
             "retained_stop_points": len(stop_points_g),
         }
 
@@ -163,17 +149,14 @@ def process_single_file(data_path: str, strategy: str, output_dir: str) -> dict[
         )
         compressed_n = HYSOCCompressor(config=config_n).compress(raw_points)
         all_points_n, stop_points_n, _move_segments_n = extract_compressed_points_separate(compressed_n)
-        stops_count = sum(1 for s in compressed_n.compressed_segments if s.segment_type == "stop")
-        moves_count = sum(1 for s in compressed_n.compressed_segments if s.segment_type == "move")
-        factor_n = _safe_ratio(compressed_n.total_original_points, compressed_n.total_compressed_points)
 
         results["strategies"]["network_semantic"] = {
-            "original_points": compressed_n.total_original_points,
-            "compressed_points": compressed_n.total_compressed_points,
-            "compression_ratio": factor_n,
-            "num_segments": len(compressed_n.compressed_segments),
-            "num_stops": stops_count,
-            "num_moves": moves_count,
+            "original_points": len(compressed_n.original_points),
+            "compressed_points": len(compressed_n.keypoints),
+            "compression_ratio": compressed_n.compression_ratio,
+            "num_segments": len(compressed_n.segments),
+            "num_stops": len(compressed_n.stops()),
+            "num_moves": len(compressed_n.moves()),
             "retained_stop_points": len(stop_points_n),
         }
 
