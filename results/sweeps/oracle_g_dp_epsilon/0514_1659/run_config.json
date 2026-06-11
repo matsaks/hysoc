@@ -1,0 +1,28 @@
+{
+  "sweep_name": "oracle_g_dp_epsilon",
+  "dataset": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Calibration_100",
+  "n_trajectories": 100,
+  "dp_epsilon_grid_m": [
+    1.0,
+    2.5,
+    5.0,
+    6.0,
+    7.0,
+    7.5,
+    8.0,
+    9.0,
+    10.0,
+    15.0,
+    20.0,
+    30.0,
+    50.0
+  ],
+  "stss_max_eps_m": 15.0,
+  "stss_min_duration_s": 30.0,
+  "stss_min_samples": 15,
+  "selection": {
+    "rule": "highest median move CR among configurations whose median move-segment mean SED <= sed_budget_m (error-bounded line simplification, SQUISH-E(mu) / Lin et al. 2021)",
+    "tiebreak": "lower median latency",
+    "sed_budget_m": 15.0
+  }
+}

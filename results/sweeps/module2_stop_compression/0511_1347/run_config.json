@@ -1,0 +1,18 @@
+{
+  "sweep_name": "module2_stop_compression",
+  "dataset": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Calibration_100",
+  "n_trajectories": 100,
+  "strategies": [
+    "centroid",
+    "medoid",
+    "snap_to_nearest",
+    "first_point"
+  ],
+  "step_max_eps_m": 15.0,
+  "step_min_duration_s": 30.0,
+  "selection": {
+    "sed_budget_m": 15.0,
+    "sed_tie_tolerance_m": 1.0,
+    "rule": "lowest median latency among feasible strategies whose median avg SED is within sed_tie_tolerance_m of the best"
+  }
+}

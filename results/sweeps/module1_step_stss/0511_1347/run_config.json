@@ -1,0 +1,26 @@
+{
+  "sweep_name": "module1_step_stss",
+  "dataset": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Calibration_100",
+  "n_trajectories": 100,
+  "eps_grid_m": [
+    10.0,
+    15.0,
+    20.0,
+    30.0,
+    50.0
+  ],
+  "t_grid_s": [
+    10.0,
+    15.0,
+    30.0,
+    60.0
+  ],
+  "min_samples_rule": "max(5, round(T * 0.5))",
+  "selection": {
+    "f1_floor_median": 0.6,
+    "min_median_step_stops": 2.0,
+    "min_median_step_moves": 2.0,
+    "f1_tie_tolerance": 0.05,
+    "rule": "highest median segment count (stops + moves) among feasible configurations whose median F1 is within f1_tie_tolerance of the best; final tiebreak smaller (eps, T)"
+  }
+}

@@ -1,0 +1,28 @@
+[project]
+name = "hysoc"
+version = "0.1.0"
+description = "Hybrid Online Semantic Compression System for GPS trajectories"
+readme = "README.md"
+authors = [
+    { name = "Mats Aksnessæther", email = "matsen2000@gmail.com" },
+    { name = "Jonas Rønning", email = "jrronning@gmail.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "contextily>=1.7.0",
+    "geopandas>=1.1.2",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.1",
+    "pandas>=3.0.0",
+    "scikit-learn>=1.8.0",
+    "shapely>=2.1.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.13",
+]

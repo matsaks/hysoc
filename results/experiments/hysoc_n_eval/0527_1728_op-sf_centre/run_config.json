@@ -1,0 +1,43 @@
+{
+  "experiment": "hysoc_n_eval",
+  "operating_point": "sf_centre",
+  "operating_point_calibrated_on": "SanFranCentre_Calibration_100",
+  "operating_point_full": {
+    "name": "sf_centre",
+    "calibrated_on": "SanFranCentre_Calibration_100",
+    "stop_max_eps_m": 10.0,
+    "stop_min_duration_s": 15.0,
+    "stss_min_samples": 8,
+    "dp_epsilon_m": 1.0,
+    "squish_capacity": 200,
+    "trace_gamma": 5.0,
+    "trace_epsilon": 15.0,
+    "trace_k": 5,
+    "trace_cleanup_threshold": 0.5,
+    "trace_decay_lambda": 0.9
+  },
+  "stop_max_eps_meters": 10.0,
+  "stop_min_duration_seconds": 15.0,
+  "trace_gamma_mps": 5.0,
+  "trace_k": 5,
+  "max_files": 0,
+  "latency_warmup": 1,
+  "latency_repeats": {
+    "plain_trace": 1,
+    "baseline_n": 2,
+    "hysoc_n": 1
+  },
+  "bytes_per_point": 24,
+  "datasets": [
+    {
+      "name": "NYC_Evaluation_1000",
+      "short": "nyc",
+      "path": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Evaluation_1000"
+    },
+    {
+      "name": "SanFranCentre_Evaluation_1000",
+      "short": "sf_centre",
+      "path": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\SanFranCentre_Evaluation_1000"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "sweep_name": "module3_hysoc_g_move",
+  "dataset": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Calibration_100",
+  "n_trajectories": 100,
+  "capacity_grid": [
+    0,
+    50,
+    100,
+    200,
+    500,
+    1000,
+    2000,
+    4000
+  ],
+  "capacity_zero_means": "pure_dp (no SQUISH stage)",
+  "dp_epsilon_grid_m": [
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0,
+    10.0,
+    15.0,
+    20.0,
+    30.0,
+    50.0
+  ],
+  "step_max_eps_m": 15.0,
+  "step_min_duration_s": 30.0,
+  "selection": {
+    "sed_budget_m": 15.0,
+    "primary": "highest median move CR",
+    "tiebreak": "lower median latency"
+  },
+  "move_length_stats": {
+    "n_moves": 486,
+    "min": 1,
+    "max": 647,
+    "mean": 83.65020576131687,
+    "median": 51.0,
+    "p90": 198.0,
+    "p95": 253.25,
+    "p99": 476.24999999999966
+  }
+}

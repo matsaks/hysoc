@@ -1,0 +1,26 @@
+{
+  "experiment": "hysoc_g_eval",
+  "stop_max_eps_meters": 15.0,
+  "stop_min_duration_seconds": 30.0,
+  "dp_epsilon_meters": 5.0,
+  "squish_capacity": 200,
+  "max_files": 0,
+  "latency_warmup": 1,
+  "latency_repeats": {
+    "plain_dp": 5,
+    "baseline_g": 2,
+    "hysoc_g": 5
+  },
+  "datasets": [
+    {
+      "name": "NYC_Evaluation_1000",
+      "short": "nyc",
+      "path": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\NYC_Evaluation_1000"
+    },
+    {
+      "name": "SanFranCentre_Evaluation_1000",
+      "short": "sf_centre",
+      "path": "C:\\Users\\mats-\\NTNU\\hysoc\\data\\raw\\SanFranCentre_Evaluation_1000"
+    }
+  ]
+}
